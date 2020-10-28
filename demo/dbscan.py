@@ -99,10 +99,11 @@ def plot_feature(data, clusters, cluster_num):
 
 def main():
     dataSet = load_data_set("./788points.txt")
-    dataSet = np.mat(dataSet).transpose()
-    clusters, cluster_num = dbscan(dataSet, 2, 15)
-    print("cluster num = ", cluster_num)
-    plot_feature(dataSet, clusters, cluster_num)
+    print(dataSet)
+    #dataSet = np.mat(dataSet).transpose()
+    #clusters, cluster_num = dbscan(dataSet, 2, 15)
+    #print("cluster num = ", cluster_num)
+    #plot_feature(dataSet, clusters, cluster_num)
 
 
 if __name__ == '__main__':

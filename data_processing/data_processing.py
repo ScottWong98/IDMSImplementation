@@ -4,21 +4,11 @@ import time
 import random
 import numpy as np
 from sklearn.neighbors import KDTree
+import matplotlib.pyplot as plt
 
-start = time.process_time()
 
-
-class VisitList:
-
-    def __init__(self, num=0):
-        self.unvisited_list = [i for i in range(num)]
-        self.unvisited_num = num
-        self.visited_list = list()
-
-    def visit(self, point_id):
-        self.visited_list.append(point_id)
-        self.unvisited_list.remove(point_id)
-        self.unvisited_num -= 1
+UNCLASSIFIED = False
+NOISE = 0
 
 
 def string2datetime(_raw_datetime):
@@ -26,8 +16,7 @@ def string2datetime(_raw_datetime):
     return datetime.datetime.strptime(_raw_datetime, "%Y%m%d%H%M%S")
 
 
-def load_data(filename, ):
-
+def load_data_set(filename):
     data = []
     data_loc = []
     with open(filename, 'r', encoding='UTF-8') as f:
@@ -46,106 +35,81 @@ def load_data(filename, ):
                          latitude,
                          duration])
             data_loc.append([longitude, latitude])
-            #print("TimeIn: %s, TimeOut: %s, Longitude: %s, Latitude:%s, Dura: %s"
-            #      %(time_in, time_out, longitude, latitude, dura))
-    return np.array(data), np.array(data_loc)
+    return data, data_loc
 
 
-def calculate_duration_sum(data, neighbor_points):
+def region_query_kd(data_loc, point_id, eps):
+    data_loc = data_loc.transpose()
+    tree = KDTree(data_loc)
+    seeds = tree.query_radius(data_loc[point_id], r=eps)[0].tolist()
+    return seeds
+
+
+def duration_sum_calculation(data, seeds):
     duration_sum = 0
-    for i in neighbor_points:
+    for i in seeds:
         duration_sum += data[i][4]
     return duration_sum
 
 
+def expand_cluster(data, data_loc, cluster_list, point_id, cluster_id, eps, min_duration):
+    seeds = region_query_kd(data_loc, point_id, eps)
+    if duration_sum_calculation(data, seeds) < min_duration:
+        cluster_list[point_id] = NOISE
+        return False
+    else:
+        cluster_list[point_id] = cluster_id
+        for seed_id in seeds:
+            cluster_list[seed_id] = cluster_id
+        while len(seeds) > 0:
+            current_point = seeds[0]
+            query_result = region_query_kd(data_loc, current_point, eps)
+            if duration_sum_calculation(data, query_result) >= min_duration:
+                for i in range(len(query_result)):
+                    result_point = query_result[i]
+                    if cluster_list[result_point] == UNCLASSIFIED:
+                        cluster_list[result_point] = cluster_id
+                        seeds.append(result_point)
+                    elif cluster_list[result_point] == NOISE:
+                        cluster_list[result_point] = cluster_id
+            seeds = seeds[1:]
+        return True
+
 def generate_cluster(data, data_loc, eps, min_duration):
+    cluster_id = 1
+    points_num = data_loc.shape[1]
+    cluster_list = [UNCLASSIFIED] * points_num
 
-    points_number = data_loc.shape[0]
-    visit_list = VisitList(num=points_number)
-
-    flag = -1
-    cluster_list = [-1 for i in range(points_number)]
-
-    tree = KDTree(data_loc)
-
-
-    """
-    current_point_id = random.choice(visit_list.unvisited_list)
-    # print(data_loc)
-    # print(current_point_id)
-    # print(data_loc[current_point_id])
-    neighbor_points = tree.query_radius(np.array([data_loc[current_point_id]]), r=eps)
-    duration_sum = calculate_duration_sum(data, neighbor_points)
-    print(duration_sum)
-    """
-
-    while visit_list.unvisited_num > 0:
-
-        # Generate the current point's id from unvisited list randomly
-        cur_point_id = random.choice(visit_list.unvisited_list)
-        #print("===> Debug <== cur_point_id: %d" % cur_point_id)
-
-        visit_list.visit(cur_point_id)
-
-        neighbor_points = tree.query_radius(np.array([data_loc[cur_point_id]]), eps)[0].tolist()
-        #print(type(neighbor_points))
-        #neighbor_points.append(-19)
-        #print(neighbor_points[-1])
-        #break
-        duration_sum = calculate_duration_sum(data, neighbor_points)
-        #print(duration_sum)
-        # print("===> Debug <== The Size of neighbor points: %d" % len(neighbor_points))
-        if duration_sum >= min_duration:
-            flag += 1
-            cluster_list[cur_point_id] = flag
-            for point in neighbor_points:
-                # print("===> Debug <== The Size of neighbor points: %d" % len(neighbor_points))
-                #print("===> Debug <== point: %d" % point)
-                if point in visit_list.unvisited_list:
-                    # print("===> Debug <== The current point is unvisited")
-                    visit_list.visit(point)
-                    npn_points = tree.query_radius(np.array([data_loc[point]]), eps)[0].tolist()
-                    # print(len(npn_points))
-                    if calculate_duration_sum(data, npn_points) >= min_duration:
-                        #print(calculate_duration_sum(data, npn_points))
-                        for i in npn_points:
-                            if i not in neighbor_points:
-                                # print("==> DEBUG <== Add one element to neighbor_points")
-                                neighbor_points.append(i)
-                if cluster_list[point] == -1:
-                    cluster_list[point] = flag
-            # print("*******************")
-        else:
-            cluster_list[cur_point_id] = -1
-
-    return cluster_list
+    for point_id in range(points_num):
+        if cluster_list[point_id] == UNCLASSIFIED:
+            if expand_cluster(data, data_loc, cluster_list, point_id, cluster_id, eps, min_duration):
+                cluster_id = cluster_id + 1
+    return cluster_list, cluster_id - 1
 
 
-def kd_tree():
-    rng = np.random.RandomState(0)
-    X = rng.random_sample((10, 2))
-    print(X)
-    print(X[0])
-    tree = KDTree(X, leaf_size=2)
-    print(tree.query_radius(np.array([X[0]]), r=0.3))
-    print(X[:1])
+def plot_feature(data, clusters, cluster_num):
+    clusters_mat = np.mat(clusters).transpose()
+    fig = plt.figure()
+    scatter_colors = ['black', 'blue', 'green', 'yellow', 'red', 'purple', 'orange', 'brown']
+    ax = fig.add_subplot(111)
+    for i in range(cluster_num + 1):
+        color_style = scatter_colors[i % len(scatter_colors)]
+        sub_cluster = data[:, np.nonzero(clusters_mat[:, 0].A == i)]
+        ax.scatter(sub_cluster[0, :].flatten().A[0], sub_cluster[1, :].flatten().A[0], c=color_style, s=50)
+    plt.show()
+
+
+def main():
+    data_set, data_set_loc = load_data_set("../resource/test_input_1.csv")
+    data_set_loc = np.mat(data_set_loc).transpose()
+    #print(data_set_loc)
+    clusters, cluster_num = generate_cluster(data_set, data_set_loc, eps=0.0005, min_duration=10000)
+    print("Cluster num= ", cluster_num)
+    plot_feature(data_set_loc, clusters, cluster_num)
 
 
 if __name__ == '__main__':
-    data_set, data_set_loc = load_data('../resource/test_input_1.csv')
-    #print(dataSet)
-    #kd_tree()
-    mylist = generate_cluster(data_set, data_set_loc, 0.0000005, 900000)
-    cnt = 0
-    maxx = -2
-    for i in mylist:
-        if i > maxx:
-            maxx = i
-        if i != -1:
-            cnt += 1
-    print(cnt)
-    print(maxx)
-    print(mylist)
+    start = time.process_time()
+    main()
     end = time.process_time()
-    print("Running time: %s Seconds" %(end - start))
-
+    print("Finish all in %s " % str(end - start))
