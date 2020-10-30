@@ -3,7 +3,6 @@ import csv
 from data_processing.point import Point
 from data_processing.user import User
 from data_processing.trajectory import Trajectory
-from data_processing.poi import POI, POILibrary
 
 
 class DataLoad:
@@ -11,13 +10,16 @@ class DataLoad:
 
     FORMAT_DATETIME = "%Y%m%d%H%M%S"
 
-    def load_data(self, filename):
+    def __init__(self, filename):
+        self.filename = filename
+
+    def load_data(self):
         """
         加载数据
         :return: 包含User的列表
         """
         data = {}
-        with open(filename, 'r', encoding='UTF-8') as f:
+        with open(self.filename, 'r', encoding='UTF-8') as f:
             f_csv = csv.DictReader(f)
             items = list(f_csv)
             for item in items:
@@ -35,24 +37,6 @@ class DataLoad:
                 data[user_id].tr_dict[date_str].plist.append(point)
         # self.print_user_dict(data)
         return data
-
-    def load_poi(self, filename):
-        data = []
-        with open(filename, 'r', encoding='UTF-8') as f:
-            f_csv = csv.DictReader(f)
-            items = list(f_csv)
-            for item in items:
-                # print(self.get_single_poi_from_line(item))
-                poi_info = self.get_single_poi_from_line(item)
-                data.append(poi_info)
-        return data
-
-    @classmethod
-    def get_single_poi_from_line(cls, item):
-        return POI(name=item['名称'],
-                   category=[item['大类'], item['中类'], item['小类']],
-                   location=[item['省'], item['市'], item['区']],
-                   coordinate=[float(item['lon']), float(item['lat'])])
 
     @classmethod
     def string2datetime(cls, str_datetime):
@@ -115,15 +99,8 @@ class DataLoad:
 
 
 if __name__ == '__main__':
-    # data_load = DataLoad()
-    # data = data_load.load_data("../resource/test_input_2.csv")
-    # data_load.print_user_dict(data)
-    # print(data_load.load_data())
+    data_load = DataLoad("../resource/test_input_2.csv")
+    data = data_load.load_data()
+    data_load.print_user_dict(data)
+    print(data_load.load_data())
 
-    data_load = DataLoad()
-    data = data_load.load_poi("../resource/nj_poi.csv")
-    category_set = set()
-    for element in data:
-        category_set.add(element.category[0])
-
-    print(category_set)

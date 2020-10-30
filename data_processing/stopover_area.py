@@ -7,6 +7,10 @@ class StopoverArea:
         self.sn = 0
         self.duration = 0
         self.d = 0.0
+        # 停留区中心区域坐标
+        self.coordinate = []
+        # 停留区对应的POI类别
+        self.category = []
 
     def __lt__(self, other):
         return self.duration >= other.duration
@@ -15,21 +19,22 @@ class StopoverArea:
 class StopoverAreaSet:
 
     def __init__(self, tr_dict, n, theta):
+        # 用户所有轨迹集合，一个字典，可根据时间获取到当天的轨迹
         self.tr_dict = tr_dict
+        # 停留区域字典，key为停留区域聚类标签，value为StopoverArea
         self.area_dict = {}
         self.n = n
         self.theta = theta
         self.sum_d = 0.0
         self.sum_duration = 0
 
-    # TODO
     def get_semantic_dict(self):
         # 1. 获取主要驻留区域
         sr_dict = self.get_main_stopover_area()
 
-        # TODO
         # 2. 利用百度POI获取到各点关联的POI信息
-        semantic_dict = POILibrary(self.tr_dict, self.area_dict, sr_dict)
+        poi_library = POILibrary(self.tr_dict, self.area_dict, sr_dict)
+        semantic_dict = poi_library.get_sementic_dict()
 
         return semantic_dict
 
@@ -89,6 +94,7 @@ class StopoverAreaSet:
                     self.area_dict[point.sr] = StopoverArea()
                 self.area_dict[point.sr].duration += point.duration
                 self.area_dict[point.sr].d += point.total_data
+                self.area_dict[point.sr].coordinate = [point.longitude, point.latitude]
 
             for cluster_id in cluster_set:
                 self.area_dict[cluster_id].sn += 1

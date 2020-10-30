@@ -2,6 +2,7 @@ import numpy as np
 from data_processing.improved_dbscan import ImprovedDBSCAN
 from data_processing.stopover_area import StopoverAreaSet
 
+
 class User:
 
     def __init__(self, user_id):
@@ -21,17 +22,14 @@ class User:
         self.generate_sr_tr(clusters)
         self.output()
 
-    # TODO
     def semantic_tag_conversion(self, n, theta):
         # 1. 获取语义词典（ <聚类标签：POI> ）
         stopover_area_set = StopoverAreaSet(self.tr_dict, n, theta)
-        # TODO
         semantic_dict = stopover_area_set.get_semantic_dict()
 
-        print(semantic_dict)
+        # print(semantic_dict)
         # 2. 将所有轨迹点的sr改为相应的POI
-        # TODO
-        # self.generate_ms_tr(semantic_dict)
+        self.generate_ms_tr(semantic_dict)
 
     def generate_sr_tr(self, clusters):
         """
@@ -48,7 +46,9 @@ class User:
     # TODO
     def generate_ms_tr(self, semantic_dict):
         """将用户中的所有轨迹点中的sr根据semantic_dict转化成POI"""
-        pass
+        for (date, tr) in self.tr_dict.items():
+            for point in tr.plist:
+                point.sr = semantic_dict[point.sr]
 
     def get_all_plist(self):
         """获取该用户的所有轨迹点列表"""

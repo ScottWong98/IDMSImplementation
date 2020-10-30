@@ -1,5 +1,7 @@
 import random
 from operator import itemgetter, attrgetter
+from sklearn.neighbors import KNeighborsClassifier
+from collections import Counter
 
 
 def test_delete_element_from_list():
@@ -65,6 +67,7 @@ class Stu:
     def __lt__(self, other):
         return self.math >= other.math
 
+
 def test_sort():
     i_dict = {
         1: Stu('stu01', 22, 33),
@@ -84,9 +87,35 @@ def test_sort():
         #print(type(val))
 
 
+def test_KNN():
+    X = [[0], [1], [1], [2], [3]]
+    y = [0, 0, 0, 1, 1]
+    neigh = KNeighborsClassifier(n_neighbors=3)
+    neigh.fit(X, y)
+    print(neigh.predict([[1.1]]))
+    print(neigh.kneighbors([[1.1]]))
+
+
+def test_counter():
+    List = [1, 2, 2, 4, 5]
+    seed = 6
+    match_num = [i for i in List if i == seed]
+    print(match_num)
+    if len(match_num) == 0:
+        print("1231231")
+
+    i_dict = {
+        "1": 1,
+        "2": 2
+    }
+    print(list(i_dict.items())[0][0])
+
+
 if __name__ == '__main__':
+    test_counter()
+    # test_KNN()
     # test_set()
-    test_sort()
+    # test_sort()
     # test_delete_element_from_list()
     # a = 111
     # b = 222
