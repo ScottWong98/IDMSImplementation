@@ -17,18 +17,6 @@ class DataProcess:
         self.min_duration = min_duration
         self.user_dict = {}
 
-    # @classmethod
-    # def get_user_plist(cls, user_dict):
-    #     plist, loc_plist = [], []
-    #     for (user_id, user) in user_dict.items():
-    #         for (date, tr) in user.tr_dict.items():
-    #             for idx, point in enumerate(tr.plist):
-    #                 _list = [point.time_in, point.time_out, point.longitude, point.latitude,
-    #                          point.duration, point.day_number, point.total_data]
-    #                 plist.append(_list)
-    #                 loc_plist.append([point.longitude, point.latitude])
-    #     return plist, loc_plist
-
     def stopover_area_excavation(self):
         """停留点区域挖掘
         :return: 带有聚类标签的用户轨迹数据
@@ -50,7 +38,7 @@ class DataProcess:
 
 if __name__ == '__main__':
     start = time.process_time()
-    data_process = DataProcess("../resource/test_input_2.csv", 0.01, 5000)
+    data_process = DataProcess("../resource/test_input_1.csv", 0.01, 5000)
     data_process.stopover_area_excavation()
     data_process.semantic_tag_conversion(n=22, theta=0.99)
     end = time.process_time()

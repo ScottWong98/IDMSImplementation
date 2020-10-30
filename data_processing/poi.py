@@ -59,8 +59,8 @@ class POILibrary:
         data_load = POILoad()
         self.poi_list, self.X, self.y = data_load.load_poi("../resource/nj_poi.csv")
 
-    def get_sementic_dict(self):
-        sementic_dict = {}
+    def get_semantic_dict(self):
+        semantic_dict = {}
 
         self.load_poi()
         # 1. KNN
@@ -78,15 +78,15 @@ class POILibrary:
 
             for b_ctg in category_dict:
                 if self.judge_main_area(cluster_id, b_ctg):
-                    sementic_dict[cluster_id] = self.get_multi_category(b_ctg, category_list)
+                    semantic_dict[cluster_id] = self.get_multi_category(b_ctg, category_list)
                     break
             # 说明对于家和工作这种地点，在k个邻居里面没有找到匹配的
             # 暂时设置为K个邻居中出现次数最多的那个
-            if cluster_id not in sementic_dict:
+            if cluster_id not in semantic_dict:
                 b_ctg = list(category_dict.items())[0][0]
-                sementic_dict[cluster_id] = self.get_multi_category(b_ctg, category_list)
+                semantic_dict[cluster_id] = self.get_multi_category(b_ctg, category_list)
 
-        return sementic_dict
+        return semantic_dict
 
     def judge_main_area(self, cluster_id, base_category):
         if cluster_id not in self.sr_dict:

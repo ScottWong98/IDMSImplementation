@@ -20,7 +20,7 @@ class User:
 
         # 3. 更改每个轨迹点的sr值，赋予聚类标签
         self.generate_sr_tr(clusters)
-        self.output()
+        # self.output()
 
     def semantic_tag_conversion(self, n, theta):
         # 1. 获取语义词典（ <聚类标签：POI> ）

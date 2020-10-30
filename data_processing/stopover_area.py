@@ -34,7 +34,7 @@ class StopoverAreaSet:
 
         # 2. 利用百度POI获取到各点关联的POI信息
         poi_library = POILibrary(self.tr_dict, self.area_dict, sr_dict)
-        semantic_dict = poi_library.get_sementic_dict()
+        semantic_dict = poi_library.get_semantic_dict()
 
         return semantic_dict
 
@@ -81,7 +81,10 @@ class StopoverAreaSet:
 
     def home_probe(self, sn, d):
         sn_probe = sn / self.n
-        d_probe = d / self.sum_d
+        if self.sum_d != 0:
+            d_probe = d / self.sum_d
+        else:
+            d_probe = 1
         return sn_probe + (1 - d_probe)
 
     def handle_all_area(self):
