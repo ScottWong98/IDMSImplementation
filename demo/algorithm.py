@@ -1,4 +1,5 @@
 import random
+from operator import itemgetter, attrgetter
 
 
 def test_delete_element_from_list():
@@ -42,6 +43,7 @@ def test_merge_adjacent_points():
             result[val] += 1
     print(result)
 
+
 def test_set():
     i_set = set()
     i_set.add(1)
@@ -53,8 +55,38 @@ def test_set():
     print(i_set)
 
 
+class Stu:
+
+    def __init__(self, name, chinese, math):
+        self.name = name
+        self.chinese = chinese
+        self.math = math
+
+    def __lt__(self, other):
+        return self.math >= other.math
+
+def test_sort():
+    i_dict = {
+        1: Stu('stu01', 22, 33),
+        2: Stu('stu02', 33, 44),
+        3: Stu('stu03', 44, 11),
+        4: Stu('stu04', 55, 8),
+        7: Stu('stu07', 44, 90),
+        5: Stu('stu05', 66, 90),
+        6: Stu('stu06', 44, 90)
+    }
+    # result = (sorted(i_dict.items(), key = lambda kv:(kv[1], kv[0])))
+    # result = sorted(i_dict.items(), key=attrgetter('math'), reverse=True)
+    result = (sorted(i_dict.items(), key=lambda kv: (kv[1], kv[0])))
+    print(i_dict)
+    for idx, val in enumerate(result):
+        print(val[1].name, val[1].chinese, val[1].math)
+        #print(type(val))
+
+
 if __name__ == '__main__':
-    test_set()
+    # test_set()
+    test_sort()
     # test_delete_element_from_list()
     # a = 111
     # b = 222

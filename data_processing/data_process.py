@@ -44,16 +44,18 @@ class DataProcess:
         for (user_id, user) in self.user_dict.items():
             user.stopover_area_excavation(self.eps, self.min_duration)
 
+    # TODO
     def semantic_tag_conversion(self, n, theta):
+        # 1. 遍历每一个用户，进行语义转化
         for (user_id, user) in self.user_dict.items():
             user.semantic_tag_conversion(n, theta)
-        pass
 
 
 if __name__ == '__main__':
     start = time.process_time()
     data_process = DataProcess("../resource/test_input_2.csv", 0.01, 5000)
     data_process.stopover_area_excavation()
+    data_process.semantic_tag_conversion(n=22, theta=0.99)
     end = time.process_time()
     print("Finish all in %s " % str(end - start))
 

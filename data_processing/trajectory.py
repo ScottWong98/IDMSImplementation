@@ -65,9 +65,11 @@ class Trajectory:
         self.plist = tmp_list
 
     def remove_invalid_points(self):
+        tmp_list = []
         for p in self.plist:
-            if p.sr == 0:
-                self.plist.remove(p)
+            if p.sr != 0:
+                tmp_list.append(p)
+        self.plist = tmp_list
 
     def output(self):
         print('=' * 40)
