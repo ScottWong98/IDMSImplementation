@@ -1,3 +1,6 @@
+from data_processing.poi import POILibrary
+
+
 class StopoverArea:
 
     def __init__(self):
@@ -23,7 +26,12 @@ class StopoverAreaSet:
     def get_semantic_dict(self):
         # 1. 获取主要驻留区域
         sr_dict = self.get_main_stopover_area()
+
+        # TODO
         # 2. 利用百度POI获取到各点关联的POI信息
+        semantic_dict = POILibrary(self.tr_dict, self.area_dict, sr_dict)
+
+        return semantic_dict
 
     def get_main_stopover_area(self):
         sr_dict = {}
@@ -89,7 +97,6 @@ class StopoverAreaSet:
             self.sum_duration += area.duration
             self.sum_d += area.d
 
-    # TODO
     def sort_in_des_order(self):
         """根据停留区域的duration进行降序排列"""
         result = sorted(self.area_dict.items(), key=lambda kv: (kv[1], kv[0]))

@@ -37,8 +37,8 @@ class DataProcess:
         :return: 带有聚类标签的用户轨迹数据
         """
         # 1. 加载数据，返回的是一个以user_id为主键的User字典
-        data_load = DataLoad(self.filename)
-        self.user_dict = data_load.load_data()
+        data_load = DataLoad()
+        self.user_dict = data_load.load_data(self.filename)
 
         # 2. 遍历每一个用户，进行停留点区域挖掘
         for (user_id, user) in self.user_dict.items():
