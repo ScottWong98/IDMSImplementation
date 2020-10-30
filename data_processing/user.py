@@ -22,9 +22,9 @@ class User:
         self.generate_sr_tr(clusters)
         # self.output()
 
-    def semantic_tag_conversion(self, n, theta):
+    def semantic_tag_conversion(self, n, theta, knn_model, poi_list):
         # 1. 获取语义词典（ <聚类标签：POI> ）
-        stopover_area_set = StopoverAreaSet(self.tr_dict, n, theta)
+        stopover_area_set = StopoverAreaSet(self.tr_dict, n, theta, knn_model, poi_list)
         semantic_dict = stopover_area_set.get_semantic_dict()
 
         # print(semantic_dict)
@@ -43,7 +43,6 @@ class User:
             clusters = clusters[tr_length:]
             # tr.output()
 
-    # TODO
     def generate_ms_tr(self, semantic_dict):
         """将用户中的所有轨迹点中的sr根据semantic_dict转化成POI"""
         for (date, tr) in self.tr_dict.items():

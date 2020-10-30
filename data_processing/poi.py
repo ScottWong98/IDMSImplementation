@@ -1,7 +1,6 @@
 import csv
 from sklearn.neighbors import KNeighborsClassifier
 import numpy as np
-from collections import Counter
 
 
 class POI:
@@ -45,6 +44,30 @@ class POILoad:
 
 class POILibrary:
 
+    def __init__(self):
+        self.poi_list = []
+        # For KNN
+        self.X = []
+        # For KNN
+        self.y = []
+
+    def load_poi(self):
+        data_load = POILoad()
+        self.poi_list, self.X, self.y = data_load.load_poi("../resource/nj_poi.csv")
+
+    def generate_knn_model(self):
+        self.load_poi()
+        X = np.array(self.X)
+        y = np.array(self.y)
+
+        neigh = KNeighborsClassifier(n_neighbors=5)
+        neigh.fit(X, y)
+        return neigh, self.poi_list
+
+
+"""
+class POILibrary:
+
     def __init__(self, tr_dict, area_dict, sr_dict):
         self.tr_dict = tr_dict
         self.area_dict = area_dict
@@ -58,6 +81,13 @@ class POILibrary:
     def load_poi(self):
         data_load = POILoad()
         self.poi_list, self.X, self.y = data_load.load_poi("../resource/nj_poi.csv")
+
+    def generate_knn_model(self):
+        X = np.array(self.X)
+        y = np.array(self.y)
+        neigh = KNeighborsClassifier(n_neighbors=5)
+        neigh.fit(X, y)
+        return neigh
 
     def get_semantic_dict(self):
         semantic_dict = {}
@@ -115,6 +145,8 @@ class POILibrary:
         for c in category_list:
             if base_category == c[0]:
                 return c.tolist()
+"""
+
 
 if __name__ == '__main__':
     poi_load = POILoad()

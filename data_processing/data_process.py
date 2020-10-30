@@ -1,6 +1,6 @@
 import time
 from data_processing.data_load import DataLoad
-
+from data_processing.poi import POILibrary
 
 class DataProcess:
     """数据预处理模块
@@ -29,18 +29,28 @@ class DataProcess:
         for (user_id, user) in self.user_dict.items():
             user.stopover_area_excavation(self.eps, self.min_duration)
 
-    def semantic_tag_conversion(self, n, theta):
+    def semantic_tag_conversion(self, n, theta, knn_model, poi_list):
         # 1. 遍历每一个用户，进行语义转化
         for (user_id, user) in self.user_dict.items():
-            user.semantic_tag_conversion(n, theta)
+            user.semantic_tag_conversion(n, theta, knn_model, poi_list)
             user.output()
 
 
 if __name__ == '__main__':
     start = time.process_time()
+    # 1. 加载用户文件
     data_process = DataProcess("../resource/test_input_1.csv", 0.01, 5000)
+
+    # 2. 停留区域挖掘
     data_process.stopover_area_excavation()
-    data_process.semantic_tag_conversion(n=22, theta=0.99)
+
+    # 3. 针对百度POI建立KNN模型
+    poi_library = POILibrary()
+    neigh, poi_list_ = poi_library.generate_knn_model()
+
+    # 4. 停留区域多层次语义标签转换
+    data_process.semantic_tag_conversion(n=22, theta=0.99, knn_model=neigh, poi_list=poi_list_)
+
     end = time.process_time()
     print("Finish all in %s " % str(end - start))
 

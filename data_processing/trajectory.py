@@ -48,7 +48,6 @@ class Trajectory:
                     tmp_list.append(tmp_point)
 
                 tmp_point = point
-                # TODO: <lon, lat> OR <lat, lon>
                 xy_list = [[point.longitude, point.latitude]]
 
             else:

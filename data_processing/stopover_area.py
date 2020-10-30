@@ -1,4 +1,5 @@
-from data_processing.poi import POILibrary
+import numpy as np
+from collections import Counter
 
 
 class StopoverArea:
@@ -18,7 +19,7 @@ class StopoverArea:
 
 class StopoverAreaSet:
 
-    def __init__(self, tr_dict, n, theta):
+    def __init__(self, tr_dict, n, theta, knn_model, poi_list):
         # 用户所有轨迹集合，一个字典，可根据时间获取到当天的轨迹
         self.tr_dict = tr_dict
         # 停留区域字典，key为停留区域聚类标签，value为StopoverArea
@@ -27,15 +28,37 @@ class StopoverAreaSet:
         self.theta = theta
         self.sum_d = 0.0
         self.sum_duration = 0
+        self.sr_dict = {}
+        self.knn_model = knn_model
+        self.poi_list = poi_list
 
     def get_semantic_dict(self):
         # 1. 获取主要驻留区域
-        sr_dict = self.get_main_stopover_area()
+        self.sr_dict = self.get_main_stopover_area()
 
         # 2. 利用百度POI获取到各点关联的POI信息
-        poi_library = POILibrary(self.tr_dict, self.area_dict, sr_dict)
-        semantic_dict = poi_library.get_semantic_dict()
+        # poi_library = POILibrary(self.tr_dict, self.area_dict, sr_dict)
+        # semantic_dict = poi_library.get_semantic_dict()
+        # 2. 从之前训练的KNN模型中找到距离个点最近的POI信息
+        # semantic_dict =
+        neigh = self.knn_model
+        semantic_dict = {}
+        for (cluster_id, area) in self.area_dict.items():
+            result = neigh.kneighbors([area.coordinate])
+            category_list = [self.poi_list[index].category for index in result[1][0]]
+            category_list = np.array(category_list)
+            # print(category_list[:, 0])
+            category_dict = Counter(category_list[:, 0])
 
+            for b_ctg in category_dict:
+                if self.judge_main_area(cluster_id, b_ctg):
+                    semantic_dict[cluster_id] = self.get_multi_category(b_ctg, category_list)
+                    break
+            # 说明对于家和工作这种地点，在k个邻居里面没有找到匹配的
+            # 暂时设置为K个邻居中出现次数最多的那个
+            if cluster_id not in semantic_dict:
+                b_ctg = list(category_dict.items())[0][0]
+                semantic_dict[cluster_id] = self.get_multi_category(b_ctg, category_list)
         return semantic_dict
 
     def get_main_stopover_area(self):
@@ -111,6 +134,34 @@ class StopoverAreaSet:
         result = sorted(self.area_dict.items(), key=lambda kv: (kv[1], kv[0]))
         # print(result)
         self.area_dict = dict(result)
+
+    def judge_main_area(self, cluster_id, base_category):
+        if cluster_id not in self.sr_dict:
+            return True
+        area_flag = self.sr_dict[cluster_id]
+        # TODO: 怎么判断是否为家
+        home_list = ['商务住宅', '住宿服务', '生活服务', '地名地址信息']
+        # TODO: 怎么判断是否为公司
+        work_list = ['公司企业']
+
+        if area_flag == 'HOME':
+            match_num = [i for i in home_list if base_category == i]
+            if len(match_num) == 0:
+                return False
+            else:
+                return True
+        else:
+            match_num = [i for i in work_list if base_category == i]
+            if len(match_num) == 0:
+                return False
+            else:
+                return True
+
+    @classmethod
+    def get_multi_category(cls, base_category, category_list):
+        for c in category_list:
+            if base_category == c[0]:
+                return c.tolist()
 
     def output(self):
         print('=' * 40)
