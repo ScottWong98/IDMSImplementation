@@ -36,11 +36,7 @@ class StopoverAreaSet:
         # 1. 获取主要驻留区域
         self.sr_dict = self.get_main_stopover_area()
 
-        # 2. 利用百度POI获取到各点关联的POI信息
-        # poi_library = POILibrary(self.tr_dict, self.area_dict, sr_dict)
-        # semantic_dict = poi_library.get_semantic_dict()
         # 2. 从之前训练的KNN模型中找到距离个点最近的POI信息
-        # semantic_dict =
         neigh = self.knn_model
         semantic_dict = {}
         for (cluster_id, area) in self.area_dict.items():

@@ -69,22 +69,68 @@ class Stu:
 
 
 def test_sort():
+    # i_dict = {
+    #     1: Stu('stu01', 22, 33),
+    #     2: Stu('stu02', 33, 44),
+    #     3: Stu('stu03', 44, 11),
+    #     4: Stu('stu04', 55, 8),
+    #     7: Stu('stu07', 44, 90),
+    #     5: Stu('stu05', 66, 90),
+    #     6: Stu('stu06', 44, 90)
+    # }
+    # # result = (sorted(i_dict.items(), key = lambda kv:(kv[1], kv[0])))
+    # # result = sorted(i_dict.items(), key=attrgetter('math'), reverse=True)
+    # result = (sorted(i_dict.items(), key=lambda kv: (kv[1], kv[0])))
+    # print(i_dict)
+    # for idx, val in enumerate(result):
+    #     print(val[1].name, val[1].chinese, val[1].math)
+
+    i_set = set()
+    # print(i_set)
+    i_set.union({1, 2})
+    i_set |= {1, 2}
+    print(i_set)
     i_dict = {
-        1: Stu('stu01', 22, 33),
-        2: Stu('stu02', 33, 44),
-        3: Stu('stu03', 44, 11),
-        4: Stu('stu04', 55, 8),
-        7: Stu('stu07', 44, 90),
-        5: Stu('stu05', 66, 90),
-        6: Stu('stu06', 44, 90)
+        '住宿': 123,
+        '交通': 1231,
+        '体育': 12311,
+        '公共设施': 22
     }
-    # result = (sorted(i_dict.items(), key = lambda kv:(kv[1], kv[0])))
-    # result = sorted(i_dict.items(), key=attrgetter('math'), reverse=True)
-    result = (sorted(i_dict.items(), key=lambda kv: (kv[1], kv[0])))
-    print(i_dict)
-    for idx, val in enumerate(result):
-        print(val[1].name, val[1].chinese, val[1].math)
-        #print(type(val))
+
+    a = 1
+    b = 2
+    if a == b:
+        rs = 234
+    else:
+        rs = 333
+    print(rs)
+    #
+    # i_dict = {
+    #     (1, 2): 123,
+    #     (1, 1): 1231,
+    #     (2, 3): 12311,
+    #     (1, 3): 22
+    # }
+
+    # i_dict = {
+    #     'rT': 123,
+    #     'wer': 123,
+    #     'a': 123
+    # }
+    # if isinstance(list(i_dict.keys())[0], tuple):
+    #     print(12312312)
+    # print(type(list(i_dict.keys())[0]))
+
+    result = sorted(i_dict.items(), key=lambda d:d[0].encode('gbk'))
+    print(result)
+    # for item in result:
+    #     pass
+    # result = {}
+    # for key in sorted(i_dict.keys()):
+    #     result[key] = i_dict[key]
+    # i_dict = result
+    # print(i_dict)
+
 
 
 def test_KNN():
@@ -111,11 +157,23 @@ def test_counter():
     print(list(i_dict.items())[0][0])
 
 
+def test_list():
+    i_dict = {
+        "RT": '12312312',
+        (1, 2): "12312312",
+        "adfa": "adsfasdfa",
+        "asdfasf": "asdf"
+    }
+    for (key, value) in i_dict.items():
+        print(key, value)
+
+
 if __name__ == '__main__':
-    test_counter()
+    # test_list()
+    #test_counter()
     # test_KNN()
     # test_set()
-    # test_sort()
+    test_sort()
     # test_delete_element_from_list()
     # a = 111
     # b = 222

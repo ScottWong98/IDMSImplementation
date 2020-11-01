@@ -2,6 +2,7 @@ import time
 from data_processing.data_load import DataLoad
 from data_processing.poi import POILibrary
 
+
 class DataProcess:
     """数据预处理模块
     将收集到的用户数据处理成具有语义的用户轨迹数据
