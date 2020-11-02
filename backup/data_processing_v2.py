@@ -100,7 +100,7 @@ def plot_feature(data, clusters, cluster_num):
 
 
 def main():
-    data_set, data_set_loc = load_data_set("../resource/test_input_1.csv")
+    data_set, data_set_loc = load_data_set("../resource/test_13_user_with_flag.csv")
     data_set_loc = np.mat(data_set_loc).transpose()
     #print(data_set_loc)
     clusters, cluster_num = generate_cluster(data_set, data_set_loc, eps=0.0005, min_duration=10000)

@@ -1,3 +1,7 @@
+import time
+from data_processing.data_process import DataProcess
+
+
 class IndexTreeNode:
 
     def __init__(self, parent=None, children=None, name=None, depth=0, tr_id_set=None):
@@ -60,6 +64,31 @@ class IndexTree:
                 node_list.append(child)
             cur_node.sort_children()
 
+    def query(self, qt_rt):
+        result = set()
+
+        node_list = [self.rt]
+        qt_node_list = [qt_rt]
+        while len(node_list) != 0:
+            node = node_list[0]
+            # print(len(node_list))
+            qt_node = qt_node_list[0]
+
+            node_list = node_list[1:]
+            qt_node_list = qt_node_list[1:]
+
+            flag = True
+            for (name, child) in qt_node.children.items():
+                if name in node.children:
+                    node_list.append(node.children[name])
+                    qt_node_list.append(child)
+                    flag = False
+
+            if flag:
+                result |= node.tr_id_set
+
+        return result
+
     def output(self):
         self.dfs(self.rt)
 
@@ -70,3 +99,25 @@ class IndexTree:
         for node_name, child in node.children.items():
             self.dfs(child)
 
+
+if __name__ == '__main__':
+    start = time.process_time()
+    data_process = DataProcess("../resource/test_12_user_with_flag.csv", 0.01, 5000)
+    data_process.run()
+    space_first_edges, semantic_first_edges = data_process.extract_edges(origin_point=(190, 190), side_length=5)
+    space_first_tree = IndexTree(raw_edges=space_first_edges)
+    space_first_tree.build()
+    semantic_first_tree = IndexTree(raw_edges=semantic_first_edges)
+    semantic_first_tree.build()
+
+    query_data_process = DataProcess("../resource/test_1_user_with_flag.csv", 0.01, 5000)
+    query_data_process.run()
+    query_space_fist_edges, query_semantic_first_edges = data_process.extract_edges(origin_point=(190, 190), side_length=5)
+    query_space_first_tree = IndexTree(raw_edges=query_space_fist_edges)
+    query_space_first_tree.build()
+    # query_space_first_tree.output()
+
+    similar_tr = space_first_tree.query(query_space_first_tree.rt)
+    print(similar_tr)
+    end = time.process_time()
+    print("Finish all in %s " % str(end - start))

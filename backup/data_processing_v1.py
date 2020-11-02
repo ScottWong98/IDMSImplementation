@@ -132,7 +132,7 @@ def kd_tree():
 
 
 if __name__ == '__main__':
-    data_set, data_set_loc = load_data('../resource/test_input_1.csv')
+    data_set, data_set_loc = load_data('../resource/test_13_user_with_flag.csv')
     #print(dataSet)
     #kd_tree()
     mylist = generate_cluster(data_set, data_set_loc, 0.0000005, 900000)

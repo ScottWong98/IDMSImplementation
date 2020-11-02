@@ -77,3 +77,4 @@ class Trajectory:
         print("Date:", self.date)
         for idx, point in enumerate(self.plist):
             print(point)
+            print("###############")

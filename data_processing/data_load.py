@@ -99,7 +99,7 @@ class DataLoad:
 
 
 if __name__ == '__main__':
-    data_load = DataLoad("../resource/test_input_2.csv")
+    data_load = DataLoad("../resource/test_1_user_with_flag.csv")
     data = data_load.load_data()
     data_load.print_user_dict(data)
     print(data_load.load_data())

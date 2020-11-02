@@ -188,7 +188,7 @@ def tmp_extract_loc_data(data):
 
 
 def main():
-    data_load = DataLoad('../resource/test_input_2.csv')
+    data_load = DataLoad('../resource/test_1_user_with_flag.csv')
     user_data = data_load.load_data()
 
     for user_id in user_data:

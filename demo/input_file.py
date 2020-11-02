@@ -34,7 +34,7 @@ def load_data(filename):
 
 
 if __name__ == '__main__':
-    data_set = load_data('../resource/test_input_1.csv')
+    data_set = load_data('../resource/test_13_user_with_flag.csv')
     print(len(data_set))
     for msisdn, tr in data_set.items():
         print(msisdn)
