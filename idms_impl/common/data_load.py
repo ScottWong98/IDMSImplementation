@@ -64,7 +64,7 @@ class DataLoad:
         if dt != '':
             total_data = float(dt)
 
-        return [user_id, (time_in, time_out), (longitude, latitude), duration, day_number, total_data]
+        return [user_id, [time_in, time_out], (longitude, latitude), duration, day_number, total_data]
 
     @classmethod
     def string2datetime(cls, str_datetime):
