@@ -25,23 +25,6 @@ class Point:
                f"{self.cluster_flag}\t{self.sr}"
 
 
-class Trajectory:
-    """The trajectory set of all users"""
-
-    def __init__(self, tr_dict):
-        self.tr_dict = tr_dict
-
-    def output(self):
-        for user_id, user in self.tr_dict.items():
-            print('=' * 40)
-            print("User ID:", user_id)
-            for date, tr in user.items():
-                print('-' * 30)
-                print("Date:", date)
-                for idx, point in enumerate(tr):
-                    print(point)
-
-
 class DataLoad:
     """Load data from file"""
 
@@ -91,3 +74,14 @@ class DataLoad:
     def get_date_in_string(cls, raw_datetime):
         """ 20200101165902 -> 20200101"""
         return raw_datetime.strftime(cls.DATETIME_FORMAT)[:8]
+
+
+def tr_dict_output(tr_dict):
+    for user_id, user in tr_dict.items():
+        print('=' * 40)
+        print("User ID:", user_id)
+        for date, tr in user.items():
+            print('-' * 30)
+            print("Date:", date)
+            for idx, point in enumerate(tr):
+                print(point)
