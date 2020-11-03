@@ -13,7 +13,7 @@ class DataProcess:
 
     def load_data(self, filename):
         data_load = DataLoad()
-        self.tr_dict = data_load.load_data(filename="../../resource/test_1_user_with_flag.csv")
+        self.tr_dict = data_load.load_data(filename=filename)
 
     def stopover_area_mining(self, eps, min_duration):
         # 停留区域挖掘

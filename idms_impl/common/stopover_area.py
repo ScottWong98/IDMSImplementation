@@ -224,9 +224,11 @@ class SemanticTagConversion:
             return True
         area_flag = sr_dict[cluster_id]
         # TODO: 怎么判断是否为家
-        home_list = ['商务住宅', '住宿服务', '生活服务', '地名地址信息']
+        # home_list = ['商务住宅', '住宿服务', '生活服务', '地名地址信息']
         # TODO: 怎么判断是否为公司
-        work_list = ['公司企业']
+        # work_list = ['公司企业']
+        home_list = []
+        work_list = []
 
         if area_flag == 'HOME':
             match_num = [i for i in home_list if base_category == i]

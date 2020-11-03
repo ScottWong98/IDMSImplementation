@@ -86,6 +86,33 @@ class IndexTree:
         self.spf_rt = self.__build_tree(spf_edges)
         self.sef_rt = self.__build_tree(sef_edges)
 
+    def query(self, query_tree, beta):
+        if beta >= 0.5:  # space first
+            return self.__get_intersection(self.spf_rt, query_tree.spf_rt)
+        else:  # semantic fist
+            return self.__get_intersection(self.sef_rt, query_tree.sef_rt)
+
+    @classmethod
+    def __get_intersection(cls, rt1, rt2):
+        result = set()
+        node_list1, node_list2 = [rt1], [rt2]
+        while len(node_list1) != 0:
+            node1, node2 = node_list1[0], node_list2[0]
+            node_list1, node_list2 = node_list1[1:], node_list2[1:]
+
+            flag = True
+            for name, child in node2.children.items():
+                if name in node1.children:
+                    node_list1.append(node1.children[name])
+                    node_list2.append(node2.children[name])
+                    flag = False
+            if flag:
+                result |= node1.tr_id_set
+        return result
+
+
+
+
     @classmethod
     def __build_tree(cls, edges):
         rt = IndexTreeNode(name='RT', depth=0, tr_id_set=set([]), children={})
@@ -116,6 +143,7 @@ class IndexTree:
             cur_node.sort_children()
 
         return rt
+
 
 
 def tree_output(node):
