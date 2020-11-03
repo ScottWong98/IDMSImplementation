@@ -36,7 +36,7 @@ class DataLoad:
     DATETIME_FORMAT = "%Y%m%d%H%M%S"
 
     def load_data(self, filename):
-        """从`filename`加载数据"""
+        """从 `filename` 加载数据"""
         tr_dict = {}
         with open(filename, 'r', encoding='UTF-8') as f:
             f_csv = csv.DictReader(f)
@@ -79,7 +79,7 @@ class DataLoad:
 
     @classmethod
     def get_date_in_string(cls, raw_datetime):
-        """ 20200101165902 -> 20200101"""
+        """ `20200101165902` -> `20200101` """
         return raw_datetime.strftime(cls.DATETIME_FORMAT)[:8]
 
 

@@ -20,6 +20,7 @@ class ImprovedDBSCAN:
 
     def gen_cluster(self):
         """根据轨迹点生成聚类
+
         :return 各轨迹点的轨迹标签列表
         """
         cluster_id = 1
@@ -36,6 +37,7 @@ class ImprovedDBSCAN:
 
     def __expand_cluster(self, cluster_list, pid, cluster_id):
         """判断是否可以产生一个新的聚类，并对更新聚类里的点的聚类状态
+
         :param cluster_list: 所有点的聚类状态列表
         :param pid: 当前点的下标
         :param cluster_id: 当前的聚类标签
@@ -68,6 +70,7 @@ class ImprovedDBSCAN:
 
     def __region_query_kd(self, pid):
         """利用kdtree查询距离某点eps距离内的所有点的下标列表
+
         :param pid: 当前轨迹点在轨迹点列表中的下标
         :return 邻域内的所有点下标集合
         """
@@ -77,6 +80,7 @@ class ImprovedDBSCAN:
 
     def __duration_sum(self, pid_list):
         """计算距离当前点eps范围内的所有点的驻留总时长
+
         :param pid_list: 邻域内的所有点下标集合
         :return duration_sum: 驻留总时长
         """
