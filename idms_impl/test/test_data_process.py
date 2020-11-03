@@ -1,9 +1,9 @@
-from idms_impl.common.stopover_area import StopoverAreaSet
 from idms_impl.common.data_load import DataLoad, tr_dict_output
 from idms_impl.common.poi import POILoad
 from idms_impl.data_process import DataProcess
 
 
+"""
 def test_stopover_mining():
     print()
     # 加载数据
@@ -20,6 +20,7 @@ def test_stopover_mining():
     tr_dict = stopover_area_set.tr_dict
 
     tr_dict_output(tr_dict)
+"""
 
 
 def test_data_process():

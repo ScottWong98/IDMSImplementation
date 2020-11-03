@@ -1,5 +1,5 @@
 from idms_impl.common.data_load import DataLoad
-from idms_impl.common.stopover_area import StopoverAreaSet
+from idms_impl.common.stopover_area import StopoverAreaMining, SemanticTagConversion
 
 
 class DataProcess:
@@ -17,11 +17,12 @@ class DataProcess:
 
     def stopover_area_mining(self, eps, min_duration):
         # 停留区域挖掘
-        self.__stopover_area_set = StopoverAreaSet(self.tr_dict)
-        self.__stopover_area_set.stopover_area_mining(eps=eps, min_duration=min_duration)
-        self.tr_dict = self.__stopover_area_set.tr_dict
+        stopover_area_mining = StopoverAreaMining(self.tr_dict, eps, min_duration)
+        stopover_area_mining.run()
+        self.tr_dict = stopover_area_mining.tr_dict
 
     def semantic_tag_conversion(self, n, theta, knn_model, poi_list):
         # 语义转化
-        self.__stopover_area_set.semantic_tag_conversion(n=n, theta=theta, knn_model=knn_model, poi_list=poi_list)
-        self.tr_dict = self.__stopover_area_set.tr_dict
+        semantic_tag_conversion = SemanticTagConversion(self.tr_dict, n, theta, knn_model, poi_list)
+        semantic_tag_conversion.run()
+
