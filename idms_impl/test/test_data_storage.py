@@ -4,6 +4,7 @@ from idms_impl.common.data_load import DataLoad, tr_dict_output
 from idms_impl.common.poi import POILoad
 from idms_impl.data_process import DataProcess
 
+
 def test_data_storage():
     print()
     data_process = DataProcess()

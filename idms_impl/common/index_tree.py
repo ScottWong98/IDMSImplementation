@@ -4,13 +4,19 @@ import math
 class IndexTreeNode:
     """索引表结点"""
     def __init__(self, parent=None, children=None, name=None, depth=0, tr_id_set=None):
+        # 父节点
         self.parent = parent
+        # 孩子结点
         self.children = children
+        # 结点名称
         self.name = name
+        # 结点所处深度
         self.depth = depth
+        # 当前结点所包含的子节点中的所有轨迹标识集合
         self.tr_id_set = tr_id_set
 
     def sort_children(self):
+        """对该结点的孩子进行排序"""
         if len(self.children) == 0:
             return
         ordered_dict = {}
@@ -25,21 +31,32 @@ class IndexTreeNode:
 
 
 class EdgeExtract:
-    """从tr_dict预处理出所有的边"""
+    """从tr_dict预处理出所有的边
+    包括空间优先和语义优先树所需要的
+    """
 
     def __init__(self, tr_dict, origin_point, side_length):
+        # 轨迹表
         self.tr_dict = tr_dict
+        # 栅格化的原点
         self.origin_point = origin_point
+        # 栅格化的边长
         self.side_length = side_length
 
     def extract(self):
+        """预处理所有的边
+
+        :return 空间优先树的边集，语义优先树的边集
+        """
         spf_edges, sef_edges = [], []
         for user_id, user_tr_dict in self.tr_dict.items():
             for date, tr in user_tr_dict.items():
+                # 轨迹标识
                 tr_id = (user_id, date)
                 for idx, p in enumerate(tr):
                     # 栅格化过后的编码ID
                     code_id = self.__rasterize(p.coordinate)
+                    # 提取语义和栅格编码信息
                     spf_list, sef_list = ['RT', code_id], ['RT']
                     for element in p.sr:
                         spf_list.append(element)
@@ -52,6 +69,8 @@ class EdgeExtract:
 
     @classmethod
     def __update_edges(cls, _list, edges, tr_id):
+        """生成边
+        """
         for depth, start_point in enumerate(_list):
             if depth == len(_list) - 1:
                 break
@@ -66,6 +85,7 @@ class EdgeExtract:
         return edges
 
     def __rasterize(self, coordinate):
+        """栅格化坐标"""
         x, y = coordinate[0], coordinate[1]
         xx = math.floor((x - self.origin_point[0]) / self.side_length)
         yy = math.floor((y - self.origin_point[1]) / self.side_length)
@@ -77,7 +97,9 @@ class IndexTree:
 
     def __init__(self, tr_dict):
         self.tr_dict = tr_dict
+        # 空间优先树的根节点
         self.spf_rt = None
+        # 语义优先树的根节点
         self.sef_rt = None
 
     def build(self, origin_point, side_length):
@@ -94,6 +116,7 @@ class IndexTree:
 
     @classmethod
     def __get_intersection(cls, rt1, rt2):
+        """"求两棵树的交集"""
         result = set()
         node_list1, node_list2 = [rt1], [rt2]
         while len(node_list1) != 0:
@@ -109,9 +132,6 @@ class IndexTree:
             if flag:
                 result |= node1.tr_id_set
         return result
-
-
-
 
     @classmethod
     def __build_tree(cls, edges):
@@ -143,7 +163,6 @@ class IndexTree:
             cur_node.sort_children()
 
         return rt
-
 
 
 def tree_output(node):

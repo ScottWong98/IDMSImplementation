@@ -6,17 +6,18 @@ class SIMDS:
     def simds(self, tr1, tr2, beta):
         xy_list1 = self.__extract_coordinate(tr1)
         xy_list2 = self.__extract_coordinate(tr2)
-
+        # print(xy_list1)
+        # print(xy_list2)
         d = self.__space_similarity(xy_list1, xy_list2)
         # print("d: ", d)
 
         sem_dict1 = self.__extract_semantic(tr1)
         sem_dict2 = self.__extract_semantic(tr2)
-        print(sem_dict1)
-        print(sem_dict2)
+        # print(sem_dict1)
+        # print(sem_dict2)
         s = self.__semantic_similarity(sem_dict1, sem_dict2)
 
-        print("s: ", s)
+        # print("s: ", s)
         return beta * d + (1 - beta) * s
 
     @classmethod
@@ -39,9 +40,9 @@ class SIMDS:
         for i in reversed(range(maxx)):
             sem1 = sem_dict1[i] if i in sem_dict1 else []
             sem2 = sem_dict2[i] if i in sem_dict2 else []
-            print(cls.__lcss(sem1, sem2))
+            # print(cls.__lcss(sem1, sem2))
             sim.append(cls.__lcss(sem1, sem2) / minn)
-        print(sim)
+        # print(sim)
         if sim[0] == 0 or sim[-1] == 0:
             return 0
 
