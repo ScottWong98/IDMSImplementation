@@ -3,16 +3,20 @@ import datetime
 
 
 class Point:
-    """Track point information"""
+    """轨迹点信息"""
     def __init__(self, user_id, time, coordinate,
                  duration, day_number, total_data):
+        # 轨迹点所属的用户ID
         self.user_id = user_id
         # (time_in, time_out)
         self.time = time
         # (longitude, latitude)
         self.coordinate = coordinate
+        # 用户在当前轨迹点的停留时间
         self.duration = duration
+        # 轨迹点所属的day id
         self.day_number = day_number
+        # 用户在当前轨迹点的流量消耗
         self.total_data = total_data
         # cluster flag, default = 0
         self.cluster_flag = 0
@@ -26,11 +30,13 @@ class Point:
 
 
 class DataLoad:
-    """Load data from file"""
+    """从文件读取数据"""
 
+    # 日期时间格式
     DATETIME_FORMAT = "%Y%m%d%H%M%S"
 
     def load_data(self, filename):
+        """从`filename`加载数据"""
         tr_dict = {}
         with open(filename, 'r', encoding='UTF-8') as f:
             f_csv = csv.DictReader(f)
@@ -51,6 +57,7 @@ class DataLoad:
         return tr_dict
 
     def extract_data(self, item):
+        """从文件中的一行数据中提取有用数据"""
         user_id = item['MSISDN']
         time_in = self.string2datetime(item['STIME'])
         time_out = self.string2datetime(item['END_TIME'])

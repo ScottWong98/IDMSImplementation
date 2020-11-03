@@ -28,10 +28,11 @@ def test_data_process():
     data_process = DataProcess()
     data_process.load_data(filename="../../resource/test_1_user_with_flag.csv")
     data_process.stopover_area_mining(eps=0.01, min_duration=5000)
-    poi_load = POILoad(filename="../../resource/nj_poi.csv")
-    poi_load.train_data(k=5)
-    knn_model, poi_list = poi_load.knn_model, poi_load.poi_list
-    data_process.semantic_tag_conversion(n=22, theta=0.99, knn_model=knn_model, poi_list=poi_list)
-    tr_dict = data_process.tr_dict
-
-    tr_dict_output(tr_dict)
+    tr_dict_output(data_process.tr_dict)
+    # poi_load = POILoad(filename="../../resource/nj_poi.csv")
+    # poi_load.train_data(k=5)
+    # knn_model, poi_list = poi_load.knn_model, poi_load.poi_list
+    # data_process.semantic_tag_conversion(n=22, theta=0.99, knn_model=knn_model, poi_list=poi_list)
+    # tr_dict = data_process.tr_dict
+    #
+    # tr_dict_output(tr_dict)

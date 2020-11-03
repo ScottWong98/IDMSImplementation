@@ -19,27 +19,40 @@ class StopoverArea:
 class StopoverAreaMining:
 
     def __init__(self, tr_dict, eps, min_duration):
+        # 轨迹表
         self.tr_dict = tr_dict
+        # 聚类半径
         self.__eps = eps
+        # 最小驻留时长
         self.__min_duration = min_duration
+        # 驻留时长列表
         self.__duration_list = []
+        # 坐标列表
         self.__coordinate_list = []
+        # 聚类标签列表
         self.__clusters = []
+        # 聚类中心点坐标字典<cluster_flag: coordinate>
         self.__cluster_core_dict = []
 
     def run(self):
+        """
+        对每个用户的所有轨迹点进行停留区域的挖掘，并且更新轨迹
+        """
         for user_id, user_tr_dict in self.tr_dict.items():
             # 获取当前用户所有轨迹点的duration列表和坐标列表
+            # 更新self.__duration_list 和 self.__coordinate_list
             self.__get_all_plist(user_tr_dict)
             # 获取每个轨迹点的聚类结果
+            # 更新 self.clusters
             self.__gen_clusters()
             # 获取每个聚类的中心点坐标
+            # 更新 self.__cluster_core_dict
             self.__get_cluster_core()
             # 根据聚类结果对每条轨迹进行更新（更新轨迹点的聚类标签，删除无效轨迹点，合并轨迹点）
             new_user_tr = {}
             for date, tr in user_tr_dict.items():
                 tr_len = len(tr)
-                # 更新轨迹点的聚类标签，删除无效轨迹点
+                # 更新轨迹点的聚类标签并删除无效轨迹点
                 tmp_tr = self.__delete_invalid_point(tr, self.__clusters[:tr_len])
                 # 合并轨迹点
                 tmp_tr = self.__merge_adjacent_points(tmp_tr)
@@ -92,6 +105,7 @@ class StopoverAreaMining:
         self.__clusters = improved_dbscan.gen_cluster()
 
     def __get_cluster_core(self):
+        """获取每个聚类的中心点坐标"""
         self.__cluster_core_dict = {}
         for idx, cf in enumerate(self.__clusters):
             if cf not in self.__cluster_core_dict:
