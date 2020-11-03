@@ -22,11 +22,12 @@ class Point:
         self.cluster_flag = 0
         # multi-level semantic flag
         self.sr = []
+        self.poi = None
 
     def __str__(self):
         return f"{self.user_id}\t{self.time}\t{self.coordinate}\t" \
                f"{self.duration}\t{self.day_number}\t{self.total_data}\t" \
-               f"{self.cluster_flag}\t{self.sr}"
+               f"{self.cluster_flag}\t{self.sr}\t{self.poi}"
 
 
 class DataLoad:

@@ -6,17 +6,24 @@ from collections import Counter
 class StopoverArea:
 
     def __init__(self):
+        # 用户在停留区域的驻留总天数
         self.sn = 0
+        # 用户在停留区域的驻留总时长
         self.duration = 0
+        # 用户在停留区域的日均流量消耗
         self.d = 0.
+        # 停留区域中心点坐标
         self.coordinate = []
+        # 停留区域多层语义
         self.category = []
 
     def __lt__(self, other):
+        """对停留区域按照驻留总时长降序排序"""
         return self.duration >= other.duration
 
 
 class StopoverAreaMining:
+    """停留区域挖掘"""
 
     def __init__(self, tr_dict, eps, min_duration):
         # 轨迹表
@@ -113,6 +120,7 @@ class StopoverAreaMining:
             self.__cluster_core_dict[cf].append(self.__coordinate_list[idx])
         for cf, xy_list in self.__cluster_core_dict.items():
             self.__cluster_core_dict[cf] = self.__get_core_coordinate(xy_list)
+            # self.__cluster_core_dict[cf] = self.__get_core_coordinate_in_middle_point(xy_list)
 
     @classmethod
     def __get_core_coordinate(cls, xy_list):
@@ -124,49 +132,88 @@ class StopoverAreaMining:
         _len = len(xy_list)
         return _x / _len, _y / _len
 
+    @classmethod
+    def __get_core_coordinate_in_middle_point(cls, xy_list):
+        """获取当前列表中的中间点，不求平均值"""
+        sorted(xy_list)
+        n = len(xy_list)
+        return xy_list[n // 2]
+
 
 class SemanticTagConversion:
+    """语义标签转化"""
 
     def __init__(self, tr_dict, n, theta, knn_model, poi_list):
+        # 轨迹表
         self.tr_dict = tr_dict
+        # 用户数据观察周期总天数
         self.__n = n
+        # 阈值
         self.__theta = theta
+        # 训练好的KNN模型
         self.__knn_model = knn_model
+        # POI信息列表
         self.__poi_list = poi_list
+        # 停留区域字典
         self.__area_dict = {}
+        # 用户在所有停留区域的总驻留时长
         self.__sum_duration = 0
+        # 用户在所有停留区域的日均流量消耗总和
         self.__sum_d = 0.
 
     def run(self):
+        """
+        对每个用户的所有轨迹点进行语义标签转化
+        """
+        # 遍历每个用户
         for user_id, user_tr_dict in self.tr_dict.items():
-            # 获取主要驻留区域
+            # 获取当前用户的主要驻留区域
             sr_dict = self.__get_main_area(user_tr_dict)
-            # 利用KNN找到距离各点最近的POI信息
             semantic_dict = {}
+            poi_dict = {}
+            # 遍历每一个停留区域
             for cluster_id, area in self.__area_dict.items():
+                # 利用KNN模型得到距离当前停留区域最近的k个POI点
+                # Finds the K-neighbors of a point.
+                # Returns indices of and distances to the neighbors of each point.
+                # result = [[[距离]], [[下标]]]
                 result = self.__knn_model.kneighbors([area.coordinate])
+                # 距离最近的k个POI多层语义集合
+                # ed: [['餐饮服务', '中餐厅', '特色/地方风味餐厅'],...,['生活服务', '美容美发店', '美容美发店']]
                 category_list = [self.__poi_list[index].category for index in result[1][0]]
+                neigh_poi_list = [self.__poi_list[index] for index in result[1][0]]
                 category_list = np.array(category_list)
-                # print(category_list[:, 0])
+                # 统计每个POI的大类出现的次数，并按照出现次数从大到小排列
+                # eg: {'餐饮服务': 3, '体育休闲服务': 1, '生活服务': 1}
                 category_dict = Counter(category_list[:, 0])
-
+                # 遍历每个大类
                 for b_ctg in category_dict:
+                    # 判断是否和当前停留区域的属性相符，过滤不合法的
                     if self.__judge_main_area(sr_dict, cluster_id, b_ctg):
-                        semantic_dict[cluster_id] = self.__get_multi_category(b_ctg, category_list)
+                        semantic_dict[cluster_id], poi_dict[cluster_id] = self.__get_multi_category(b_ctg,
+                                                                                                    category_list,
+                                                                                                    neigh_poi_list)
                         break
-                # 说明对于家和工作这种地点，在k个邻居里面没有找到匹配的
+                # 说明对于家和工作这种地点，在k个邻居里面没有找到匹配的 或者当前停留区域为普通区域
                 # 暂时设置为K个邻居中出现次数最多的那个
                 if cluster_id not in semantic_dict:
-                    b_ctg = list(category_dict.items())[0][0]
-                    semantic_dict[cluster_id] = self.__get_multi_category(b_ctg, category_list)
+                    b_ctg = list(category_dict.most_common(1))[0][0]
+                    # 根据大类获得到多层语义
+                    semantic_dict[cluster_id], poi_dict[cluster_id] = self.__get_multi_category(b_ctg, category_list,
+                                                                                                neigh_poi_list)
             for date, tr in user_tr_dict.items():
                 for point in tr:
                     point.sr = semantic_dict[point.cluster_flag]
+                    point.poi = poi_dict[point.cluster_flag]
 
     def __get_main_area(self, user_tr_dict):
-        """获取主要驻留区域"""
+        """获取主要驻留区域
+
+        :param user_tr_dict: 某一用户的所有轨迹
+        :return sr_dict: 主要驻留区域
+        """
         sr_dict, sr_list = {}, []
-        # 处理各停留区的数据信息
+        # 处理各停留区的数据信息(计算停留区域的sn，duration，d)
         self.__handle_area(user_tr_dict)
         # 对各停留区依据duration进行降序排列
         self.__sort_area_in_des_order()
@@ -220,7 +267,6 @@ class SemanticTagConversion:
     def __sort_area_in_des_order(self):
         """根据停留区域的duration进行降序排列"""
         result = sorted(self.__area_dict.items(), key=lambda kv: (kv[1], kv[0]))
-        # print(result)
         self.__area_dict = dict(result)
 
     def __home_probe(self, sn, d):
@@ -235,14 +281,12 @@ class SemanticTagConversion:
     def __judge_main_area(cls, sr_dict, cluster_id, base_category):
         """判断是否满足主要驻留区域的条件"""
         if cluster_id not in sr_dict:
-            return True
+            return False
         area_flag = sr_dict[cluster_id]
         # TODO: 怎么判断是否为家
-        # home_list = ['商务住宅', '住宿服务', '生活服务', '地名地址信息']
+        home_list = ['商务住宅', '住宿服务', '生活服务', '地名地址信息']
         # TODO: 怎么判断是否为公司
-        # work_list = ['公司企业']
-        home_list = []
-        work_list = []
+        work_list = ['公司企业']
 
         if area_flag == 'HOME':
             match_num = [i for i in home_list if base_category == i]
@@ -258,8 +302,9 @@ class SemanticTagConversion:
                 return True
 
     @classmethod
-    def __get_multi_category(cls, base_category, category_list):
-        for c in category_list:
+    def __get_multi_category(cls, base_category, category_list, neigh_poi_list):
+        """根据大类获取多层语义 """
+        for idx, c in enumerate(category_list):
             if base_category == c[0]:
-                return c.tolist()
+                return c.tolist(), neigh_poi_list[idx]
 
