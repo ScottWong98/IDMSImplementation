@@ -1,32 +1,55 @@
 import pandas as pd
 import numpy as np
 import math
-from typing import List, Dict
+from typing import List, Dict, NamedTuple
 from sklearn.metrics.pairwise import haversine_distances
 from sklearn.cluster import DBSCAN
 
-Coord = np.ndarray
-float64 = np.float64
+
+#  """ Define Stop Area Structure """
+SA = NamedTuple('SA', [('left', int), ('right', int),
+                       ('dur_sum', int), ('cid', int)])
 
 
-def get_dist(p1: Coord, p2: Coord) -> float64:
+def get_dist(p1: np.ndarray, p2: np.ndarray) -> np.float64:
     """Get the distance of two coordinate using haversine
 
-    * Each value's unit in p1 and p2 is angle, so it must be converted to
+    - Each value's unit in p1 and p2 is angle, so it must be converted to
         radian before using haversine. 
-    * p1 and p2: [latitude, longitude]
+    - p1 and p2: [latitude, longitude]
 
     Args:
-        p1 (Coord): first point [lat, lon]
-        p2 (Coord): second point [lat, lon] 
+        p1 (np.ndarray): first point [lat, lon]
+        p2 (np.ndarray): second point [lat, lon] 
 
     Returns:
-        float64: the distance of p1 and p2 in angle unit
+        np.float64: the distance of p1 and p2 in angle unit
     """
     p1 = p1 * math.pi / 180
     p2 = p2 * math.pi / 180
     d = haversine_distances([p1, p2])
     return d[0, 1] * 180 / math.pi
+
+
+def gen_cluster_labels(coords: np.ndarray, durs: np.ndarray, eps: float, min_dur: int) -> np.ndarray:
+    """Generate cluster labels by using DBSCAN
+
+    Args:
+        coords (np.ndarray): [[lat, lon], [lat, lon], ..., [lat,lon]]
+        durs (np.ndarray): [dur1, dur2, ..., dur_n]
+        eps (float): the radius in angle unit
+        min_dur (int): the min_samples in DBSCAN
+
+    Returns:
+        np.ndarray: the labels of each point after clustering. 
+                    `-1` is invalid point
+                    eg: [-1, 0, 1, 2, 3, 0, 0]
+    """
+    coords = coords * math.pi / 180
+    reps = eps * math.pi / 180
+    clustering = DBSCAN(eps=reps, min_samples=min_dur, algorithm='ball_tree', metric='haversine')\
+        .fit(X=coords, sample_weight=durs)
+    return clustering.labels_
 
 
 class DataLoad:
@@ -66,21 +89,22 @@ class DataLoad:
 
         For each trajectory, find all the bad rows where coordinate is nan and calculate
         the sum of duration in the bad rows.
-        - Check the sum of duraiton
-            - zero, no action, just return the original trajectory
-            - greater than `dur_threshold`, delete this trajectory
-            - less than `dur_threshold`, 
-                check the distance between the two ends of each nan trajectory
-                    - if all of distances less than dist_threshold, just delete the bad
+
+        Check the sum of duraiton:
+            if zero, no action, just return the original trajectory
+            else if greater than `dur_threshold`, delete this trajectory
+            else if less than `dur_threshold`, 
+                check the distance between the two ends of each nan trajectory:
+                    if all of distances less than dist_threshold, just delete the bad
                         rows in this trajectory
-                    - else, delete this trajectory
+                    else, delete this trajectory
 
         Args:
-            dur_threshold (float): [description]
-            dist_threshold (float): [description]
+            dur_threshold (float): judge if delete the trajectory
+            dist_threshold (float): judge if delete the trajectory 
         """
 
-        def handle_single_tr(tr):
+        def handle_single_tr(tr: pd.DataFrame) -> pd.DataFrame:
             nan_filt = np.isnan(tr['LATITUDE']) | np.isnan(tr['LONGITUDE']) |\
                 pd.isna(tr['ZH_LABEL'])
             invalid_points_dur_sum = tr[nan_filt].DURATION.sum()
@@ -113,12 +137,77 @@ class DataLoad:
         self.df = tr_grp.apply(handle_single_tr)
         self.df.reset_index(drop=True, inplace=True)
 
-    def clustering(self, eps: float, min_dur: int) -> None:
+    def stop_area_mining(self, dur_threshold: float, eps: float, min_dur: int) -> None:
+        """Stop Area Mining
 
-        pass
+        Before clustering, you need to delete those points whose duration less than `dur_threshold`
+        (eg: 20s).
 
-    def stop_area_mining(self):
-        pass
+        Use the global function of `gen_cluster_labels` to cluster, and get the labels of all points.
+
+        Insert `CLUSTER_ID` column in the end of DataFrame and delete those invalid points whose cluster id
+        is `-1`.
+
+        Delete the invalid stop area in each trajectory.
+
+        Args:
+            dur_threshold (float): delete the point whose duration less than 
+                                    dur_threshold before clustering, in second unit
+            eps (float): the eps of DBSCAN, its unit is angle
+            min_dur (int): the minimun duration of one valid stop area
+        """
+        def delete_invalid_area(tr: pd.DataFrame) -> pd.DataFrame:
+            durs, cids = tr['DURATION'].values, tr['CLUSTER_ID'].values
+            sas: List[SA] = []
+            n, left = tr.shape[0], 0
+
+            for i in range(1, n):
+                if cids[i] != cids[i - 1]:
+                    sas.append(
+                        SA(left, i - 1, durs[left:i].sum(), cids[i - 1]))
+                    left = i
+            sas.append(SA(left, n - 1, durs[left:-1].sum(), cids[-1]))
+
+            is_valid = np.array([True] * tr.shape[0])
+            n, left = len(sas), 0
+            for i in range(1, n - 1):
+                if sas[i].cid == sas[left].cid or sas[i].cid == sas[i + 1].cid or sas[i].dur_sum > min_dur:
+                    left = i
+                else:
+                    is_valid[sas[i].left:sas[i].right + 1] = False
+            tr = tr[is_valid]
+
+            return tr
+
+        def handle_single_user(user: pd.DataFrame) -> pd.DataFrame:
+            coords = user.loc[:, ['LATITUDE', 'LONGITUDE']].values
+            durs = user.loc[:, 'DURATION'].values
+
+            cluster_flags = gen_cluster_labels(coords=coords, durs=durs,
+                                               eps=eps, min_dur=min_dur)
+            user['CLUSTER_ID'] = cluster_flags.reshape(
+                cluster_flags.shape[0], 1)
+            user = user[user.CLUSTER_ID != -1]
+
+            #  NOTE: Uncomment it if you want display the DataFrame which just doesn't
+            #           contain the points whose cluster id is -1
+            # user.reset_index(drop=True, inplace=True)
+
+            return user
+
+        self.df = self.df[self.df.DURATION > dur_threshold]
+        self.df.reset_index(drop=True, inplace=True)
+
+        user_grp = self.df.groupby(['USER_ID'], sort=False)
+        self.df = user_grp.apply(handle_single_user)
+        self.df.reset_index(drop=True, inplace=True)
+
+        # TODO: need to log not print
+        print("[INFO] Finish clustering...")
+
+        tr_grp = self.df.groupby(['USER_ID', 'STAT_DATE'], sort=False)
+        self.df = tr_grp.apply(delete_invalid_area)
+        self.df.reset_index(drop=True, inplace=True)
 
     def main_stop_area_mining(self):
         pass
