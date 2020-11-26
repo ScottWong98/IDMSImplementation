@@ -32,8 +32,10 @@ class TrajectoryGenerator:
         self.sam.merge_adjacent_points()
         self.df = self.sam.df
 
-    def semantic_tr_convertion(self):
+    def semantic_tag_conversion(self, theta: float, poi_gen):
         self.stc = SemanticTagConversion(self.df)
+        self.stc.main_area_mining(theta=theta)
+        self.stc.semantic_tag_conversion(poi_gen=poi_gen)
 
     ######################################
     # The following method is to debug
