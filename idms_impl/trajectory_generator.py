@@ -1,4 +1,5 @@
 from .stop_area_mining import StopAreaMining
+from .semantic_tag_conversion import SemanticTagConversion
 from typing import Dict, List
 import numpy as np
 import pandas as pd
@@ -8,6 +9,7 @@ class TrajectoryGenerator:
 
     def __init__(self):
         self.sam: StopAreaMining = StopAreaMining()
+        self.stc: SemanticTagConversion = None
         self.df: pd.DataFrame = None
 
     def stop_area_mining(
@@ -31,7 +33,7 @@ class TrajectoryGenerator:
         self.df = self.sam.df
 
     def semantic_tr_convertion(self):
-        pass
+        self.stc = SemanticTagConversion(self.df)
 
     ######################################
     # The following method is to debug
