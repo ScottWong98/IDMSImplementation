@@ -263,5 +263,13 @@ class StopAreaMining:
         # reset the index of the dataframe and its order
         self.df.reset_index(inplace=True)
         cols = self.df.columns.tolist()
-        cols = cols[:1] + cols[2:] + cols[1:2]
+
+        # ['USER_ID', 'CLUSTER_ID', 'STAT_DATE', 'STIME', 'END_TIME', 'ZH_LABEL', 'LATITUDE',
+        # 'LONGITUDE', 'DURATION', 'TOTAL_DATA']
+        # =>
+        # ['USER_ID', 'STAT_DATE', 'STIME', 'END_TIME', 'LATITUDE','LONGITUDE',
+        #  'DURATION', 'TOTAL_DATA', 'CLUSTER_ID']
+
+        # delete 'ZH_LABEL' and move 'CLUSTER_ID' to the end
+        cols = cols[:1] + cols[2:5] + cols[6:] + cols[1:2]
         self.df = self.df[cols]
