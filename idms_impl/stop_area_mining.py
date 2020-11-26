@@ -168,8 +168,13 @@ class StopAreaMining:
 
             is_valid = np.array([True] * tr.shape[0])
             n, left = len(sas), 0
-            for i in range(1, n - 1):
-                if sas[i].cid == sas[left].cid or sas[i].cid == sas[i + 1].cid or sas[i].dur_sum > min_dur:
+            for i in range(n):
+                if sas[i].dur_sum >= min_dur:
+                    left = i
+                    break
+            is_valid[0:sas[left].left] = False
+            for i in range(left + 1, n):
+                if sas[i].cid == sas[left].cid or sas[i].dur_sum >= min_dur:
                     left = i
                 else:
                     is_valid[sas[i].left:sas[i].right + 1] = False
@@ -207,7 +212,14 @@ class StopAreaMining:
         self.df = tr_grp.apply(delete_invalid_area)
         self.df.reset_index(drop=True, inplace=True)
 
-    def merge_adjacent_points(self):
+    def merge_adjacent_points(self) -> None:
+        """Merge Adjacent points in each trajectory
+
+        - Calculate the core coordinate in every cluster for each user
+        - In each Trajectory, merge the adjacent points to one stop area where
+            the `duration` and 'total_data' is the sum of those adjacent points
+        - Change each stop area's coordinate to core coordinate
+        """
 
         def handle_each_user(user):
             cluster_grp = user.groupby(['CLUSTER_ID'], sort=False)
@@ -224,30 +236,32 @@ class StopAreaMining:
 
             for i in range(area_index.shape[0]):
                 left = area_index[i]
-                right = -1 if i + 1 == area_index.shape[0] \
+                right = tr.index[-1] + 1\
+                    if i + 1 == area_index.shape[0] \
                     else area_index[i + 1]
-                tr.loc[left, 'DURATION'] = tr.loc[left:right, 'DURATION'].sum()
-                tr.loc[left, 'TOTAL_DATA'] = tr.loc[left:right, 'TOTAL_DATA'].sum()
+                tr.loc[left, 'DURATION'] = \
+                    self.df.loc[left:right - 1, 'DURATION'].sum()
+                tr.loc[left, 'TOTAL_DATA'] = \
+                    self.df.loc[left:right - 1, 'TOTAL_DATA'].sum()
 
-            uid = tr.iloc[0, 0]
-            # TODO: change coords to core_coords
-            tr[['LATITUDE', 'LONGITUDE']] = tr[[
-                'LATITUDE', 'LONGITUDE']].apply(lambda x: expression)
             new_tr = tr.loc[area_index]
-
-            # TODO
-            # new_tr['DURATION'] =
-
-            # TODO
-            # new_tr['TOTAL_DATA'] =
-
-            #
 
             return new_tr
 
+        # calculate the core coordinate
         user_grp = self.df.groupby(['USER_ID'], sort=False)
         core_coords = user_grp.apply(handle_each_user)
 
+        # merge adjacent points to one stop area
         tr_grp = self.df.groupby(['USER_ID', 'STAT_DATE'], sort=False)
-        res = tr_grp.apply(handle_each_tr)
-        return res
+        self.df = tr_grp.apply(handle_each_tr)
+
+        # change each area's coordinate to core coordinate
+        self.df.set_index(['USER_ID', 'CLUSTER_ID'], inplace=True)
+        self.df.loc[core_coords.index, ['LATITUDE', 'LONGITUDE']] = core_coords
+
+        # reset the index of the dataframe and its order
+        self.df.reset_index(inplace=True)
+        cols = self.df.columns.tolist()
+        cols = cols[:1] + cols[2:] + cols[1:2]
+        self.df = self.df[cols]
