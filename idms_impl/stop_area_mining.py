@@ -224,7 +224,7 @@ class StopAreaMining:
         def handle_each_user(user):
             cluster_grp = user.groupby(['CLUSTER_ID'], sort=False)
             core_coords = cluster_grp.apply(
-                lambda x: x[['LATITUDE', 'LONGITUDE']].mean())
+                lambda x: x[['LATITUDE', 'LONGITUDE']].median())
             return core_coords
 
         def handle_each_tr(tr):

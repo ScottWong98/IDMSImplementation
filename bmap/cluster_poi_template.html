@@ -1,0 +1,63 @@
+<!DOCTYPE html>  
+<html>
+<head>  
+<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />  
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />  
+<title>Cluster POI</title>  
+<style type="text/css">  
+html{height:100%}  
+body{height:100%;margin:0px;padding:0px}  
+#container{height:100%}  
+</style>  
+<script type="text/javascript" src="http://api.map.baidu.com/api?v=3.0&ak=E93WsW7IxtDkB5TVUz5W6lwL4Mls1tri"></script>
+</head>  
+ 
+<body>  
+<div id="container"></div> 
+<script type="text/javascript"> 
+var map = new BMap.Map("container");      
+map.enableScrollWheelZoom(true);
+var scaleCtrl = new BMap.ScaleControl();  // 添加比例尺控件
+map.addControl(scaleCtrl);
+
+var raw_data = '{"0":{"LONGITUDE":118.7110929786,"LATITUDE":31.9674344534,"poi_lon":118.7112434837,"poi_lat":31.9671630067},"2":{"LONGITUDE":118.7287868905,"LATITUDE":31.9834719927,"poi_lon":118.7287998032,"poi_lat":31.9836477479},"4":{"LONGITUDE":118.7218009524,"LATITUDE":32.0179266667,"poi_lon":118.7204502561,"poi_lat":32.0180890451},"3":{"LONGITUDE":118.700947,"LATITUDE":31.988228,"poi_lon":118.7010307142,"poi_lat":31.9881995819},"7":{"LONGITUDE":118.40028,"LATITUDE":31.93689,"poi_lon":118.4002523933,"poi_lat":31.9366284565},"10":{"LONGITUDE":118.7177336364,"LATITUDE":32.1426027273,"poi_lon":118.7176319256,"poi_lat":32.1426811047},"12":{"LONGITUDE":118.753679,"LATITUDE":32.039263,"poi_lon":118.7538275855,"poi_lat":32.038855778},"14":{"LONGITUDE":118.7777536538,"LATITUDE":32.0797891154,"poi_lon":118.7778158399,"poi_lat":32.079367769},"6":{"LONGITUDE":118.70386,"LATITUDE":31.96595,"poi_lon":118.7028158052,"poi_lat":31.9648495925},"16":{"LONGITUDE":118.6889794583,"LATITUDE":31.946715625,"poi_lon":118.6886589514,"poi_lat":31.9463829307},"15":{"LONGITUDE":118.7049892222,"LATITUDE":31.9539535556,"poi_lon":118.7048194968,"poi_lat":31.9538602495},"17":{"LONGITUDE":118.72711,"LATITUDE":31.96176,"poi_lon":118.7274239688,"poi_lat":31.9608403638},"18":{"LONGITUDE":118.7864844477,"LATITUDE":32.0239897423,"poi_lon":118.7866817059,"poi_lat":32.023778686},"19":{"LONGITUDE":118.78173925,"LATITUDE":32.0143009,"poi_lon":118.7815078778,"poi_lat":32.0138525476},"20":{"LONGITUDE":118.78963001,"LATITUDE":32.01560301,"poi_lon":118.7894529453,"poi_lat":32.0154507349},"21":{"LONGITUDE":118.793476,"LATITUDE":31.971302,"poi_lon":118.7934438189,"poi_lat":31.9711245143},"22":{"LONGITUDE":118.737625663,"LATITUDE":32.059315837,"poi_lon":118.7376149042,"poi_lat":32.0592800223},"23":{"LONGITUDE":118.90133,"LATITUDE":32.07416,"poi_lon":118.8999514462,"poi_lat":32.0748168056},"1":{"LONGITUDE":118.7195162,"LATITUDE":31.9829798,"poi_lon":118.7197412201,"poi_lat":31.9835347236}}';
+var data = JSON.parse(raw_data);
+var delt_lon = 0.01131452;
+var delt_lat = 0.00394299;
+
+var center_x, center_y;
+var cnt = 0;
+for (cid in data) {
+    
+    data[cid]['LONGITUDE'] += delt_lon;
+    data[cid]['poi_lon'] += delt_lon;
+    data[cid]['LATITUDE'] += delt_lat;
+    data[cid]['poi_lat'] += delt_lat;
+    if (cnt == 0) {
+        center_x = data[cid]['LONGITUDE']
+        center_y = data[cid]['LATITUDE']
+    }
+    cnt += 1;
+}
+map.centerAndZoom(new BMap.Point(center_x, center_y), 12); 
+for (cid in data) {
+    var x = data[cid]['LONGITUDE'];
+    var y = data[cid]['LATITUDE'];
+    var poi_x = data[cid]['poi_lon'];
+    var poi_y = data[cid]['poi_lat'];
+    addPoint('C' + cid, x, y, -5, -20);
+    addPoint('P' + cid, poi_x, poi_y, -5, -20);
+}
+function addPoint(content, x, y, off_x, off_y) {
+    var p = new BMap.Point(x, y);
+    var m = new BMap.Marker(p);
+    var label = new BMap.Label(content, {
+        position: p,
+        offset: new BMap.Size(off_x, off_y)
+    })
+    map.addOverlay(m);
+    map.addOverlay(label)
+}
+</script>  
+</body>  
+</html>

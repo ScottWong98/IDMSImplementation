@@ -50,7 +50,10 @@ class SemanticTagConversion:
         # initialize the `type` column
         self.cluster_attr['type'] = np.array(['other'] *
                                              self.cluster_attr.shape[0])
+        print(sr_list)
         n_sr = len(sr_list)
+        if n_sr > 3:
+            return
         if n_sr == 1:
             types = ['home']
         elif n_sr == 2:
@@ -58,7 +61,7 @@ class SemanticTagConversion:
                 types = ['home', 'work']
             else:
                 types = ['work', 'home']
-        else:
+        elif n_sr == 3:
             d = self.cluster_attr.loc[sr_list, 'd'].values
             if d[0] > (d[1] + d[2]) / 2:
                 types = ['work', 'home', 'home']
@@ -92,13 +95,18 @@ class SemanticTagConversion:
             dur_sum_in_user = self.cluster_attr.loc[uid, 'dur_sum'].sum()
 
             # all clusters in this user
-            cur_cluster_attr = self.cluster_attr.loc[uid]
+            cur_cluster_attr = self.cluster_attr.copy().loc[uid]
             # sr_list: the index of cluster in self.cluster_attr
             sr_list, tmp_dur_sum = [], 0
             for cluster_id, row in cur_cluster_attr.T.iteritems():
                 tmp_dur_sum += row['dur_sum']
+                # print(uid, tmp_dur_sum, tmp_dur_sum / dur_sum_in_user)
                 if tmp_dur_sum / dur_sum_in_user <= theta:
                     sr_list.append((uid, cluster_id))
+                else:
+                    sr_list.append((uid, cluster_id))
+                    break
+
             self.check_cluster_type(sr_list, n)
             return self.cluster_attr.loc[uid]
 
@@ -106,7 +114,6 @@ class SemanticTagConversion:
         self.cluster_attr = user_grp.apply(gen_cluster_attr)
 
         self.cluster_attr = user_grp.apply(gen_main_area)
-        # print(self.cluster_attr)
 
     def semantic_tag_conversion(self, poi_gen):
 
@@ -118,27 +125,38 @@ class SemanticTagConversion:
 
             def find_poi():
                 if cluster_type == 'home':
-                    for base_ctg, _ in base_ctg_counter:
+                    for base_ctg in base_ctg_counter:
                         if base_ctg in home_list:
                             return get_ctg(base_ctg)
                 elif cluster_type == 'work':
-                    for base_ctg, _ in base_ctg_counter:
+                    for base_ctg in base_ctg_counter:
                         if base_ctg in work_list:
                             return get_ctg(base_ctg)
-                return get_ctg(base_ctg_counter[0][0])
             coords = cluster[:2].values.reshape(1, 2)
             cluster_type = cluster[-1]
-            poi_index = poi_gen.knn_model.kneighbors(
-                coords, return_distance=False).flatten()
-            ctgs = poi_gen.poi_df.iloc[poi_index, :7].values
-            base_ctg_counter = Counter(ctgs[:, 0]).most_common()
-            poi = find_poi()
+            if cluster_type == 'other':
+                poi_index = poi_gen.knn_model.kneighbors(
+                    coords, return_distance=False).flatten()
+            else:
+                poi_index = poi_gen.main_model.kneighbors(
+                    coords, return_distance=False).flatten()
+
+            ctgs = poi_gen.poi_df.iloc[poi_index, :].values
+            ctgs[:, [-2, -1]] = ctgs[:, [-1, -2]]
+
+            if cluster_type == 'other':
+                base_ctg = Counter(ctgs[:, 0]).most_common(1)[0][0]
+                poi = get_ctg(base_ctg)
+            else:
+                base_ctg_counter = ctgs[:, 0]
+                poi = find_poi()
+
             poi_series = pd.Series(poi, index=['big_ctg', 'medium_ctg', 'small_ctg',
-                                               'name', 'province', 'city', 'region'])
+                                               'name', 'province', 'city', 'region', 'poi_lat', 'poi_lon'])
             cluster = cluster.append(poi_series)
             return cluster
 
-        home_list = ['商务住宅', '住宿服务', '生活服务', '地名地址信息']
+        home_list = ['商务住宅']
         work_list = ['公司企业']
 
         # Generate cluster poi
@@ -151,5 +169,13 @@ class SemanticTagConversion:
 
         self.df.set_index(['USER_ID', 'CLUSTER_ID'], inplace=True)
         self.df[['type', 'big_ctg', 'medium_ctg', 'small_ctg',
-                 'name', 'province', 'city', 'region']] = self.cluster_poi.iloc[:, 2:]
+                 'name', 'province', 'city', 'region', 'poi_lat', 'poi_lon']] = self.cluster_poi.iloc[:, 2:]
         self.df.reset_index(drop=False, inplace=True)
+
+    def gen_cluster_poi_json(self, dir_name):
+        cluster_poi = self.cluster_poi.reset_index(drop=False)
+        user_grp = cluster_poi.groupby(['USER_ID'], sort=False)
+        for uid, user in user_grp:
+            user.set_index('CLUSTER_ID', inplace=True)
+            user = user[['LONGITUDE', 'LATITUDE', 'poi_lon', 'poi_lat']]
+            user.to_json(f'{dir_name}{uid}.json', orient='index')
