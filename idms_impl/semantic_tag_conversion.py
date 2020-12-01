@@ -1,63 +1,119 @@
 import pandas as pd
 import numpy as np
-import math
-from typing import List
 from collections import Counter
 
 
 class SemanticTagConversion:
 
-    def __init__(self, df: pd.DataFrame):
+    HOME_LIST = ['商务住宅']
+    WORK_LIST = ['公司企业']
+
+    def __init__(self, df, poi_gen):
         self.df: pd.DataFrame = df
-        # cluster's attributes(sn, dur_sum, d)
         self.cluster_attr: pd.DataFrame = None
-        self.cluster_poi: pd.DataFrame = None
+        self.poi_gen = poi_gen
 
-    def home_prob(self, cid: tuple, n: int) -> float:
-        """Calculate home prob
+    def main_area_mining(self, theta):
+        mam = MainAreaMining(self.df)
+        mam.gen_cluster_attr()
+        mam.gen_cluster_type(theta)
+        self.cluster_attr = mam.cluster_attr
 
-        home_prob = sn_prob + (1 - d_prob)
+    def semantic_tag_conversion(self):
 
-        sn_prob = sn / n
+        self.cluster_attr = self.cluster_attr = self.cluster_attr.apply(
+            self.__semantic_tag_conversion, axis=1
+        )
 
-        d_prob = d / sum(d)
+        addon_columns = list(self.cluster_attr.columns)[5:]
+        _columns = list(self.df.columns) + addon_columns
 
-        Args:
-            cid (tuple): (<user id>, <cluster_id>)
-            n (int): observation days of this user
+        self.df.set_index(['CLUSTER_ID'], inplace=True)
+        self.df[addon_columns] = self.cluster_attr.iloc[:, 5:]
+        self.df.reset_index(drop=False, inplace=True)
+        self.df = self.df[_columns]
+        self.df.reset_index(drop=True, inplace=True)
+        # print(self.df.columns)
 
-        Returns:
-            float: the result of home prob
-        """
-        sn = self.cluster_attr.loc[cid, 'sn']
-        sn_prob = sn / n
-        d = self.cluster_attr.loc[cid, 'd']
-        sum_d = self.cluster_attr.loc[cid[0], 'd'].sum()
-        # sum_d may be zone
-        d_prob = 0. if sum_d == 0. else d / sum_d
-        return sn_prob + (1 - d_prob)
+    def __semantic_tag_conversion(self, cluster: pd.Series):
+        coords = cluster[['core_lat', 'core_lon']].values.reshape(1, 2)
+        ctype = cluster['type']
+        if ctype == 'other':
+            poi_index = self.poi_gen.knn_model.kneighbors(
+                coords, return_distance=False
+            ).flatten()
+        else:
+            poi_index = self.poi_gen.main_model.kneighbors(
+                coords, return_distance=False
+            ).flatten()
+        pois = self.poi_gen.poi_df.iloc[poi_index, :]
 
-    def check_cluster_type(self, sr_list: List, n: int) -> None:
-        """ Check cluster type
+        big_ctg = Counter(pois.iloc[:, 0].values).most_common(1)[0][0]
 
-        Check cluster type is `home`, `work` or `other`
+        poi = pois[pois['big_ctg'] == big_ctg].iloc[0]
+        if ctype != 'other':
+            if ctype == 'home':
+                judge_list = self.HOME_LIST
+            else:
+                judge_list = self.WORK_LIST
+            for row in self.poi_gen.poi_df.loc[poi_index].itertuples():
+                if row.big_ctg in judge_list:
+                    poi = pd.Series(
+                        [row.big_ctg, row.medium_ctg, row.small_ctg, row.name, row.province, row.city, row.region,
+                            row.poi_lat, row.poi_lon],
+                        index=pois.columns
+                    )
+                    break
+        # print(poi)
+        cluster = cluster.append(poi)
+        return cluster
 
-        Args:
-            sr_list (List): the cluster id 
-            n (int): obversion days of this user
-        """
 
-        # initialize the `type` column
-        self.cluster_attr['type'] = np.array(['other'] *
-                                             self.cluster_attr.shape[0])
-        print(sr_list)
+class MainAreaMining:
+
+    def __init__(self, df):
+        self.df: pd.DataFrame = df
+        self.cluster_attr: pd.DataFrame = None
+        # observation days of this user
+        self.n = self.df['STAT_DATE'].nunique()
+        self.sum_d = 0
+
+    def gen_cluster_attr(self):
+        cluster_grp = self.df.groupby(['CLUSTER_ID'], sort=False)
+        self.cluster_attr = cluster_grp.apply(
+            lambda cluster: pd.Series(
+                [cluster['STAT_DATE'].nunique(), cluster['DURATION'].sum(),
+                 cluster['TOTAL_DATA'].sum() / cluster['STAT_DATE'].nunique(),
+                 cluster['LATITUDE'].iloc[0], cluster['LONGITUDE'].iloc[0]],
+                index=['sn', 'dur_sum', 'd', 'core_lat', 'core_lon']
+            )
+        )
+        self.cluster_attr.sort_values('dur_sum', ascending=False, inplace=True)
+        self.sum_d = self.cluster_attr['d'].sum()
+
+    def gen_cluster_type(self, theta):
+
+        total_dur_sum = self.df['DURATION'].sum()
+        sr_list, tmp_dur_sum = [], 0
+        for row in self.cluster_attr.itertuples():
+            tmp_dur_sum += row.dur_sum
+            if tmp_dur_sum / total_dur_sum <= theta:
+                sr_list.append(row.Index)
+            else:
+                sr_list.append(row.Index)
+                break
+
+        self.cluster_attr['type'] = np.array(
+            ['other'] * self.cluster_attr.shape[0])
+
         n_sr = len(sr_list)
+
         if n_sr > 3:
             return
         if n_sr == 1:
             types = ['home']
         elif n_sr == 2:
-            if self.home_prob(sr_list[0], n) > self.home_prob(sr_list[1], n):
+            if self.home_prob(sr_list[0]) > self.home_prob(sr_list[1]):
                 types = ['home', 'work']
             else:
                 types = ['work', 'home']
@@ -67,115 +123,15 @@ class SemanticTagConversion:
                 types = ['work', 'home', 'home']
             else:
                 types = ['home', 'work', 'work']
+
         self.cluster_attr.loc[sr_list, 'type'] = types
 
-    def main_area_mining(self, theta: float) -> None:
-        """ Main Area Mining
+    def home_prob(self, cid):
 
-        For each user, get the attributes of all clusters(eg: sn, dur_sum, d), and sort it
-        by dur_sum in descending order.
+        assert self.n != 0
 
-        For each user, judge each cluster's type (home, work, other).
-
-        Args:
-            theta (float): use it to generate sr_list
-        """
-        def gen_cluster_attr(user):
-            cluster_grp = user.groupby(['CLUSTER_ID'], sort=False)
-            _clusters = cluster_grp.apply(lambda x: pd.Series([x['STAT_DATE'].nunique(), x['DURATION'].sum(),
-                                                               x['TOTAL_DATA'].sum() / x['STAT_DATE'].nunique()],
-                                                              index=['sn', 'dur_sum', 'd']))
-            _clusters.sort_values('dur_sum', ascending=False, inplace=True)
-            return _clusters
-
-        def gen_main_area(user):
-            # n is the obversion days
-            n = user['STAT_DATE'].nunique()
-            uid = user.iloc[0, 0]
-            dur_sum_in_user = self.cluster_attr.loc[uid, 'dur_sum'].sum()
-
-            # all clusters in this user
-            cur_cluster_attr = self.cluster_attr.copy().loc[uid]
-            # sr_list: the index of cluster in self.cluster_attr
-            sr_list, tmp_dur_sum = [], 0
-            for cluster_id, row in cur_cluster_attr.T.iteritems():
-                tmp_dur_sum += row['dur_sum']
-                # print(uid, tmp_dur_sum, tmp_dur_sum / dur_sum_in_user)
-                if tmp_dur_sum / dur_sum_in_user <= theta:
-                    sr_list.append((uid, cluster_id))
-                else:
-                    sr_list.append((uid, cluster_id))
-                    break
-
-            self.check_cluster_type(sr_list, n)
-            return self.cluster_attr.loc[uid]
-
-        user_grp = self.df.groupby(['USER_ID'], sort=False)
-        self.cluster_attr = user_grp.apply(gen_cluster_attr)
-
-        self.cluster_attr = user_grp.apply(gen_main_area)
-
-    def semantic_tag_conversion(self, poi_gen):
-
-        def handle_each_cluster(cluster: pd.Series):
-            def get_ctg(base_ctg):
-                for ctg in ctgs:
-                    if ctg[0] == base_ctg:
-                        return ctg
-
-            def find_poi():
-                if cluster_type == 'home':
-                    for base_ctg in base_ctg_counter:
-                        if base_ctg in home_list:
-                            return get_ctg(base_ctg)
-                elif cluster_type == 'work':
-                    for base_ctg in base_ctg_counter:
-                        if base_ctg in work_list:
-                            return get_ctg(base_ctg)
-            coords = cluster[:2].values.reshape(1, 2)
-            cluster_type = cluster[-1]
-            if cluster_type == 'other':
-                poi_index = poi_gen.knn_model.kneighbors(
-                    coords, return_distance=False).flatten()
-            else:
-                poi_index = poi_gen.main_model.kneighbors(
-                    coords, return_distance=False).flatten()
-
-            ctgs = poi_gen.poi_df.iloc[poi_index, :].values
-            ctgs[:, [-2, -1]] = ctgs[:, [-1, -2]]
-
-            if cluster_type == 'other':
-                base_ctg = Counter(ctgs[:, 0]).most_common(1)[0][0]
-                poi = get_ctg(base_ctg)
-            else:
-                base_ctg_counter = ctgs[:, 0]
-                poi = find_poi()
-
-            poi_series = pd.Series(poi, index=['big_ctg', 'medium_ctg', 'small_ctg',
-                                               'name', 'province', 'city', 'region', 'poi_lat', 'poi_lon'])
-            cluster = cluster.append(poi_series)
-            return cluster
-
-        home_list = ['商务住宅']
-        work_list = ['公司企业']
-
-        # Generate cluster poi
-        c_grp = self.df.groupby(['USER_ID', 'CLUSTER_ID'], sort=False)
-        self.cluster_poi = c_grp.head(1)[['USER_ID', 'CLUSTER_ID',
-                                          'LATITUDE', 'LONGITUDE']]
-        self.cluster_poi.set_index(['USER_ID', 'CLUSTER_ID'], inplace=True)
-        self.cluster_poi['type'] = self.cluster_attr['type']
-        self.cluster_poi = self.cluster_poi.apply(handle_each_cluster, axis=1)
-
-        self.df.set_index(['USER_ID', 'CLUSTER_ID'], inplace=True)
-        self.df[['type', 'big_ctg', 'medium_ctg', 'small_ctg',
-                 'name', 'province', 'city', 'region', 'poi_lat', 'poi_lon']] = self.cluster_poi.iloc[:, 2:]
-        self.df.reset_index(drop=False, inplace=True)
-
-    def gen_cluster_poi_json(self, dir_name):
-        cluster_poi = self.cluster_poi.reset_index(drop=False)
-        user_grp = cluster_poi.groupby(['USER_ID'], sort=False)
-        for uid, user in user_grp:
-            user.set_index('CLUSTER_ID', inplace=True)
-            user = user[['LONGITUDE', 'LATITUDE', 'poi_lon', 'poi_lat']]
-            user.to_json(f'{dir_name}{uid}.json', orient='index')
+        sn = self.cluster_attr.loc[cid, 'sn']
+        sn_prob = sn / self.n
+        d = self.cluster_attr.loc[cid, 'd']
+        d_prob = 0. if self.sum_d == 0. else d / self.sum_d
+        return sn_prob + (1 - d_prob)

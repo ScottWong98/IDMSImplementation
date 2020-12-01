@@ -1,9 +1,10 @@
 import pandas as pd
 import numpy as np
 import math
-from typing import List, Dict, NamedTuple
 from sklearn.metrics.pairwise import haversine_distances
 from sklearn.cluster import DBSCAN
+from typing import List, Dict, NamedTuple
+
 
 #  """ Define Stop Area Structure """
 SA = NamedTuple('SA', [('left', int), ('right', int),
@@ -14,12 +15,12 @@ def get_dist(p1: np.ndarray, p2: np.ndarray) -> np.float64:
     """Get the distance of two coordinate using haversine
 
     - Each value's unit in p1 and p2 is angle, so it must be converted to
-        radian before using haversine. 
+        radian before using haversine.
     - p1 and p2: [latitude, longitude]
 
     Args:
         p1 (np.ndarray): first point [lat, lon]
-        p2 (np.ndarray): second point [lat, lon] 
+        p2 (np.ndarray): second point [lat, lon]
 
     Returns:
         np.float64: the distance of p1 and p2 in angle unit
@@ -40,7 +41,7 @@ def gen_cluster_labels(coords: np.ndarray, durs: np.ndarray, eps: float, min_dur
         min_dur (int): the min_samples in DBSCAN
 
     Returns:
-        np.ndarray: the labels of each point after clustering. 
+        np.ndarray: the labels of each point after clustering.
                     `-1` is invalid point
                     eg: [-1, 0, 1, 2, 3, 0, 0]
     """
@@ -52,224 +53,143 @@ def gen_cluster_labels(coords: np.ndarray, durs: np.ndarray, eps: float, min_dur
 
 
 class StopAreaMining:
-    def __init__(self) -> None:
-        self.df: pd.DataFrame = None
 
-    def load_data(self, filename: str) -> None:
-        self.df = pd.read_csv(filename, encoding='gbk')
+    def __init__(self, df):
+        # df is one user's data
+        self.df = df
+        self.core_coords = None
 
-    def format_raw_data(self, usecols: List[str], name_mapper: Dict[str, str]) -> None:
-        """Format Raw Data
+    def handle_invalid_tr(self, nan_dur_theta, dist_theta, optimize=True):
 
-        - Extract useful columns
-        - Change columns' name and order
-        - Sort data by `USER_ID` and `STIME`
-        - Set `nan` in `TOTAL_DATA` to `0`
-        - Drop rows whose `DURATION` is `0`
+        nan_filt_in_df = np.isnan(self.df['LATITUDE']) | np.isnan(
+            self.df['LONGITUDE']) | pd.isna(self.df['ZH_LABEL'])
 
-        Args:
-            usecols (List[str]): what columns and what order to use
-            name_mapper (Dict): old_column_name: new_column_name
-        """
+        if not optimize:
+            self.df.drop(self.df[nan_filt_in_df].index, inplace=True)
+            return
 
-        self.df = self.df[usecols]
-        self.df.rename(columns=name_mapper, inplace=True)
-        self.df.sort_values(by=['USER_ID', 'STIME'], inplace=True)
-        self.df['TOTAL_DATA'] = self.df['TOTAL_DATA'].fillna(0.)
-
-        filt = (self.df.DURATION == 0)
-        self.df.drop(self.df[filt].index, inplace=True)
+        self.df = self.df.groupby(['STAT_DATE'], sort=False).apply(self.__check_invalid_tr,
+                                                                   nan_dur_theta,
+                                                                   dist_theta)
 
         self.df.reset_index(drop=True, inplace=True)
 
-    def check_invalid_tr(self, nan_dur_theta: float, dist_theta: float) -> None:
-        """Check Invalid Trajectory
+    def delete_invalid_points(self, point_dur_theta):
 
-        For each trajectory, find all the bad rows where coordinate is nan and calculate
-        the sum of duration in the bad rows.
-
-        Check the sum of duraiton:
-            if zero, no action, just return the original trajectory
-            else if greater than `nan_dur_theta`, delete this trajectory
-            else if less than `nan_dur_theta`, 
-                check the distance between the two ends of each nan trajectory:
-                    if all of distances less than dist_theta, just delete the bad
-                        rows in this trajectory
-                    else, delete this trajectory
-
-        Args:
-            nan_dur_theta (float): judge if delete the trajectory
-            dist_theta (float): judge if delete the trajectory 
-        """
-
-        def handle_single_tr(tr: pd.DataFrame) -> pd.DataFrame:
-            nan_filt = np.isnan(tr['LATITUDE']) | np.isnan(tr['LONGITUDE']) |\
-                pd.isna(tr['ZH_LABEL'])
-            invalid_points_dur_sum = tr[nan_filt].DURATION.sum()
-
-            if invalid_points_dur_sum == 0:
-                return tr
-
-            if invalid_points_dur_sum >= nan_dur_theta:
-                return tr.drop(tr.index)
-
-            nan_index = tr[nan_filt].index
-            n = nan_index.shape[0]
-            left = nan_index[0] - 1
-            coord_col = ['LATITUDE', 'LONGITUDE']
-            for i in range(1, n):
-                if nan_index[i] - nan_index[i - 1] != 1:
-                    d = get_dist(self.df.loc[left, coord_col],
-                                 self.df.loc[nan_index[i - 1] + 1, coord_col])
-                    if d > dist_theta:
-                        return tr.drop(tr.index)
-                    left = nan_index[i] - 1
-            d = get_dist(self.df.loc[left, coord_col],
-                         self.df.loc[nan_index[-1] + 1, coord_col])
-            if d > dist_theta:
-                return tr.drop(tr.index)
-
-            return tr.drop(nan_index)
-
-        tr_grp = self.df.groupby(['USER_ID', 'STAT_DATE'], sort=False)
-        self.df = tr_grp.apply(handle_single_tr)
+        self.df = self.df[self.df['DURATION'] > point_dur_theta]
         self.df.reset_index(drop=True, inplace=True)
 
-    def gen_valid_area(self, point_dur_theta: float, eps: float, min_dur: int) -> None:
-        """Generate valid area
+    def gen_cluster(self, eps, min_dur):
 
-        Before clustering, you need to delete those points whose duration less than `point_dur_theta`
-        (eg: 20s).
+        coords = self.df.loc[:, ['LATITUDE', 'LONGITUDE']].values
+        durs = self.df.loc[:, 'DURATION'].values
 
-        Use the global function of `gen_cluster_labels` to cluster, and get the labels of all points.
+        cluster_flags = gen_cluster_labels(coords, durs, eps, min_dur)
 
-        Insert `CLUSTER_ID` column in the end of DataFrame and delete those invalid points whose cluster id
-        is `-1`.
+        self.df['CLUSTER_ID'] = cluster_flags.reshape(
+            cluster_flags.shape[0], 1)
+        self.df = self.df[self.df['CLUSTER_ID'] != -1]
+        self.df.reset_index(drop=True, inplace=True)
 
-        Delete the invalid stop area in each trajectory.
+    def delete_invalid_area(self, min_dur):
 
-        Args:
-            point_dur_theta (float): delete the point whose duration less than 
-                                    point_dur_theta before clustering, in second unit
-            eps (float): the eps of DBSCAN, its unit is angle
-            min_dur (int): the minimun duration of one valid stop area
-        """
-        def delete_invalid_area(tr: pd.DataFrame) -> pd.DataFrame:
-            durs, cids = tr['DURATION'].values, tr['CLUSTER_ID'].values
-            sas: List[SA] = []
-            n, left = tr.shape[0], 0
+        self.df = self.df.groupby(['STAT_DATE'], sort=False).apply(
+            self.__delete_invalid_area, min_dur)
+        self.df.reset_index(drop=True, inplace=True)
 
-            for i in range(1, n):
-                if cids[i] != cids[i - 1]:
-                    sas.append(
-                        SA(left, i - 1, durs[left:i].sum(), cids[i - 1]))
-                    left = i
-            sas.append(SA(left, n - 1, durs[left:-1].sum(), cids[-1]))
+    def gen_core_coords(self):
+        self.core_coords = self.df.groupby(['CLUSTER_ID'], sort=False).apply(
+            lambda cluster: cluster[['LATITUDE', 'LONGITUDE']].mean()
+        )
+        self.df.reset_index(drop=True, inplace=True)
 
-            is_valid = np.array([True] * tr.shape[0])
-            n, left = len(sas), 0
-            for i in range(n):
-                if sas[i].dur_sum >= min_dur:
-                    left = i
-                    break
-            is_valid[0:sas[left].left] = False
-            for i in range(left + 1, n):
-                if sas[i].cid == sas[left].cid or sas[i].dur_sum >= min_dur:
-                    left = i
-                else:
-                    is_valid[sas[i].left:sas[i].right + 1] = False
-            tr = tr[is_valid]
+    def merge_adjacent_points(self):
+        self.df = self.df.groupby(['STAT_DATE'], sort=False).apply(
+            self.__merge_adjacent_points
+        )
+        self.df.drop(['END_TIME', 'ZH_LABEL'], axis=1, inplace=True)
+        self.df.reset_index(drop=True, inplace=True)
 
+    def __check_invalid_tr(self, tr, nan_dur_theta, dist_theta):
+        nan_filt = np.isnan(tr['LATITUDE']) | np.isnan(
+            tr['LONGITUDE']) | pd.isna(tr['ZH_LABEL'])
+
+        nan_dur_sum = tr[nan_filt].DURATION.sum()
+
+        if nan_dur_sum == 0:
             return tr
 
-        def handle_single_user(user: pd.DataFrame) -> pd.DataFrame:
-            coords = user.loc[:, ['LATITUDE', 'LONGITUDE']].values
-            durs = user.loc[:, 'DURATION'].values
+        if nan_dur_sum >= nan_dur_theta:
+            return tr.drop(tr.index)
 
-            cluster_flags = gen_cluster_labels(coords=coords, durs=durs,
-                                               eps=eps, min_dur=min_dur)
-            user['CLUSTER_ID'] = cluster_flags.reshape(
-                cluster_flags.shape[0], 1)
-            user = user[user.CLUSTER_ID != -1]
+        nan_index = tr[nan_filt].index
+        n = nan_index.shape[0]
+        left = nan_index[0] - 1
+        coord_col = ['LATITUDE', 'LONGITUDE']
+        for i in range(1, n):
+            if nan_index[i] - nan_index[i - 1] != 1:
+                d = get_dist(self.df.loc[left, coord_col],
+                             self.df.loc[nan_index[i - 1] + 1, coord_col])
+                if d >= dist_theta:
+                    return tr.drop(tr.index)
+                left = nan_index[i] - 1
+        d = get_dist(self.df.loc[left, coord_col],
+                     self.df.loc[nan_index[-1] + 1, coord_col])
+        if d >= dist_theta:
+            return tr.drop(tr.index)
 
-            #  NOTE: Uncomment it if you want display the DataFrame which just doesn't
-            #           contain the points whose cluster id is -1
-            # user.reset_index(drop=True, inplace=True)
+        return tr.drop(nan_index)
 
-            return user
+    def __delete_invalid_area(self, tr, min_dur):
 
-        self.df = self.df[self.df.DURATION > point_dur_theta]
-        self.df.reset_index(drop=True, inplace=True)
+        durs, cids = tr['DURATION'].values, tr['CLUSTER_ID'].values
+        sas: List[SA] = []
+        n, left = tr.shape[0], 0
 
-        user_grp = self.df.groupby(['USER_ID'], sort=False)
-        self.df = user_grp.apply(handle_single_user)
-        self.df.reset_index(drop=True, inplace=True)
+        # generate SAs
+        for i in range(1, n):
+            if cids[i] != cids[i - 1]:
+                sas.append(SA(left, i - 1, durs[left:i].sum(), cids[i - 1]))
+                left = i
+        sas.append(SA(left, n - 1, durs[left:-1].sum(), cids[-1]))
 
-        # TODO: need to log not print
-        # print("[INFO] Finish clustering...")
+        is_valid = np.array([True] * tr.shape[0])
+        n, left = len(sas), 0
 
-        tr_grp = self.df.groupby(['USER_ID', 'STAT_DATE'], sort=False)
-        self.df = tr_grp.apply(delete_invalid_area)
-        self.df.reset_index(drop=True, inplace=True)
+        # find the first SA where dur_sum >= min_dur
+        for i in range(n):
+            if sas[i].dur_sum >= min_dur:
+                left = i
+                break
+        is_valid[0:sas[left].left] = False
 
-    def merge_adjacent_points(self) -> None:
-        """Merge Adjacent points in each trajectory
+        for i in range(left + 1, n):
+            if sas[i].cid == sas[left].cid or sas[i].dur_sum >= min_dur:
+                left = i
+            else:
+                is_valid[sas[i].left:sas[i].right+1] = False
+        tr = tr[is_valid]
 
-        - Calculate the core coordinate in every cluster for each user
-        - In each Trajectory, merge the adjacent points to one stop area where
-            the `duration` and 'total_data' is the sum of those adjacent points
-        - Change each stop area's coordinate to core coordinate
-        """
+        return tr
 
-        def handle_each_user(user):
-            cluster_grp = user.groupby(['CLUSTER_ID'], sort=False)
-            core_coords = cluster_grp.apply(
-                lambda x: x[['LATITUDE', 'LONGITUDE']].mean())
-            return core_coords
+    def __merge_adjacent_points(self, tr):
+        cid_diff = tr['CLUSTER_ID'].diff()
+        cid_diff.fillna(value=1., inplace=True)
+        cid_diff = cid_diff.astype(bool)
 
-        def handle_each_tr(tr):
-            c_diff = tr['CLUSTER_ID'].diff()
-            c_diff.fillna(value=1., inplace=True)
-            c_diff = c_diff.astype(bool)
+        area_index = cid_diff[cid_diff].index.values
 
-            area_index: np.ndarray = c_diff[c_diff].index.values
+        for i in range(area_index.shape[0]):
+            left = area_index[i]
+            if i + 1 == area_index.shape[0]:
+                right = tr.index[-1] + 1
+            else:
+                right = area_index[i + 1]
 
-            for i in range(area_index.shape[0]):
-                left = area_index[i]
-                right = tr.index[-1] + 1\
-                    if i + 1 == area_index.shape[0] \
-                    else area_index[i + 1]
-                tr.loc[left, 'DURATION'] = \
-                    self.df.loc[left:right - 1, 'DURATION'].sum()
-                tr.loc[left, 'TOTAL_DATA'] = \
-                    self.df.loc[left:right - 1, 'TOTAL_DATA'].sum()
+            tr.loc[left, 'DURATION'] = self.df.loc[left:right - 1, 'DURATION'].sum()
+            tr.loc[left, 'TOTAL_DATA'] = \
+                self.df.loc[left:right - 1, 'TOTAL_DATA'].sum()
+            tr.loc[left, ['LATITUDE', 'LONGITUDE']] = \
+                self.core_coords.loc[tr.loc[left, 'CLUSTER_ID']]
 
-            new_tr = tr.loc[area_index]
-
-            return new_tr
-
-        # calculate the core coordinate
-        user_grp = self.df.groupby(['USER_ID'], sort=False)
-        core_coords = user_grp.apply(handle_each_user)
-
-        # merge adjacent points to one stop area
-        tr_grp = self.df.groupby(['USER_ID', 'STAT_DATE'], sort=False)
-        self.df = tr_grp.apply(handle_each_tr)
-
-        # change each area's coordinate to core coordinate
-        self.df.set_index(['USER_ID', 'CLUSTER_ID'], inplace=True)
-        self.df.loc[core_coords.index, ['LATITUDE', 'LONGITUDE']] = core_coords
-
-        # reset the index of the dataframe and its order
-        self.df.reset_index(inplace=True)
-        cols = self.df.columns.tolist()
-
-        # ['USER_ID', 'CLUSTER_ID', 'STAT_DATE', 'STIME', 'END_TIME', 'ZH_LABEL', 'LATITUDE',
-        # 'LONGITUDE', 'DURATION', 'TOTAL_DATA']
-        # =>
-        # ['USER_ID', 'STAT_DATE', 'STIME', 'END_TIME', 'LATITUDE','LONGITUDE',
-        #  'DURATION', 'TOTAL_DATA', 'CLUSTER_ID']
-
-        # delete 'ZH_LABEL' and move 'CLUSTER_ID' to the end
-        cols = cols[:1] + cols[2:5] + cols[6:] + cols[1:2]
-        self.df = self.df[cols]
+        return tr.loc[area_index]
