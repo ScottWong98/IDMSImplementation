@@ -8,20 +8,33 @@ class SemanticTagConversion:
     HOME_LIST = ['商务住宅']
     WORK_LIST = ['公司企业']
 
-    def __init__(self, df, poi_gen):
+    def __init__(
+        self,
+        df,
+        poi_gen,
+        dur_sum_theta,
+    ):
         self.df: pd.DataFrame = df
-        self.cluster_attr: pd.DataFrame = None
-        self.poi_gen = poi_gen
+        self.df.reset_index(drop=True, inplace=True)
 
-    def main_area_mining(self, theta):
+        self.poi_gen = poi_gen
+        self.dur_sum_theta = dur_sum_theta
+
+        self.cluster_attr: pd.DataFrame = None
+
+    def run(self):
+        self.main_area_mining()
+        self.semantic_tag_conversion()
+
+    def main_area_mining(self):
         mam = MainAreaMining(self.df)
         mam.gen_cluster_attr()
-        mam.gen_cluster_type(theta)
+        mam.gen_cluster_type(self.dur_sum_theta)
         self.cluster_attr = mam.cluster_attr
 
     def semantic_tag_conversion(self):
 
-        self.cluster_attr = self.cluster_attr = self.cluster_attr.apply(
+        self.cluster_attr = self.cluster_attr.apply(
             self.__semantic_tag_conversion, axis=1
         )
 
@@ -33,7 +46,6 @@ class SemanticTagConversion:
         self.df.reset_index(drop=False, inplace=True)
         self.df = self.df[_columns]
         self.df.reset_index(drop=True, inplace=True)
-        # print(self.df.columns)
 
     def __semantic_tag_conversion(self, cluster: pd.Series):
         coords = cluster[['core_lat', 'core_lon']].values.reshape(1, 2)
@@ -64,7 +76,7 @@ class SemanticTagConversion:
                         index=pois.columns
                     )
                     break
-        # print(poi)
+
         cluster = cluster.append(poi)
         return cluster
 
@@ -74,7 +86,6 @@ class MainAreaMining:
     def __init__(self, df):
         self.df: pd.DataFrame = df
         self.cluster_attr: pd.DataFrame = None
-        # observation days of this user
         self.n = self.df['STAT_DATE'].nunique()
         self.sum_d = 0
 

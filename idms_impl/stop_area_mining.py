@@ -54,93 +54,135 @@ def gen_cluster_labels(coords: np.ndarray, durs: np.ndarray, eps: float, min_dur
 
 class StopAreaMining:
 
-    def __init__(self, df):
-        # df is one user's data
+    def __init__(
+        self,
+        df,
+        nan_dur_theta,
+        dist_theta,
+        point_dur_theta,
+        eps,
+        min_dur
+    ):
         self.df = df
+        self.df.reset_index(drop=True, inplace=True)
+
+        self.nan_dur_theta = nan_dur_theta
+        self.dist_theta = dist_theta
+        self.point_dur_theta = point_dur_theta
+        self.eps = eps
+        self.min_dur = min_dur
+
         self.core_coords = None
 
-    def handle_invalid_tr(self, nan_dur_theta, dist_theta, optimize=True):
-
-        nan_filt_in_df = np.isnan(self.df['LATITUDE']) | np.isnan(
-            self.df['LONGITUDE']) | pd.isna(self.df['ZH_LABEL'])
-
-        if not optimize:
-            self.df.drop(self.df[nan_filt_in_df].index, inplace=True)
+    def run(self):
+        if self.df.shape[0] == 0:
             return
+        self.handle_invalid_tr()
 
-        self.df = self.df.groupby(['STAT_DATE'], sort=False).apply(self.__check_invalid_tr,
-                                                                   nan_dur_theta,
-                                                                   dist_theta)
+        if self.df.shape[0] == 0:
+            return
+        self.delete_invalid_points()
 
+        if self.df.shape[0] == 0:
+            return
+        self.gen_cluster()
+
+        if self.df.shape[0] == 0:
+            return
+        self.delete_invalid_area()
+
+        if self.df.shape[0] == 0:
+            return
+        self.gen_core_coords()
+
+        if self.df.shape[0] == 0:
+            return
+        self.merge_adjacent_points()
+
+    def handle_invalid_tr(self):
+
+        tr_grp = self.df.groupby(['STAT_DATE'], sort=False)
+        self.df = tr_grp.apply(self.__check_invalid_tr)
         self.df.reset_index(drop=True, inplace=True)
 
-    def delete_invalid_points(self, point_dur_theta):
+    def delete_invalid_points(self):
 
-        self.df = self.df[self.df['DURATION'] > point_dur_theta]
+        self.df = self.df[self.df['DURATION'] > self.point_dur_theta]
         self.df.reset_index(drop=True, inplace=True)
 
-    def gen_cluster(self, eps, min_dur):
+    def gen_cluster(self):
 
         coords = self.df.loc[:, ['LATITUDE', 'LONGITUDE']].values
         durs = self.df.loc[:, 'DURATION'].values
 
-        cluster_flags = gen_cluster_labels(coords, durs, eps, min_dur)
+        labels = gen_cluster_labels(coords, durs, self.eps, self.min_dur)
 
-        self.df['CLUSTER_ID'] = cluster_flags.reshape(
-            cluster_flags.shape[0], 1)
+        self.df['CLUSTER_ID'] = labels.reshape(labels.shape[0], 1)
+
         self.df = self.df[self.df['CLUSTER_ID'] != -1]
         self.df.reset_index(drop=True, inplace=True)
 
-    def delete_invalid_area(self, min_dur):
+    def delete_invalid_area(self):
 
-        self.df = self.df.groupby(['STAT_DATE'], sort=False).apply(
-            self.__delete_invalid_area, min_dur)
+        tr_grp = self.df.groupby(['STAT_DATE'], sort=False)
+        self.df = tr_grp.apply(self.__delete_invalid_area)
         self.df.reset_index(drop=True, inplace=True)
 
     def gen_core_coords(self):
-        self.core_coords = self.df.groupby(['CLUSTER_ID'], sort=False).apply(
+
+        c_grp = self.df.groupby(['CLUSTER_ID'], sort=False)
+        self.core_coords = c_grp.apply(
             lambda cluster: cluster[['LATITUDE', 'LONGITUDE']].mean()
         )
         self.df.reset_index(drop=True, inplace=True)
 
     def merge_adjacent_points(self):
-        self.df = self.df.groupby(['STAT_DATE'], sort=False).apply(
-            self.__merge_adjacent_points
-        )
+
+        tr_grp = self.df.groupby(['STAT_DATE'], sort=False)
+        self.df = tr_grp.apply(self.__merge_adjacent_points)
         self.df.drop(['END_TIME', 'ZH_LABEL'], axis=1, inplace=True)
         self.df.reset_index(drop=True, inplace=True)
 
-    def __check_invalid_tr(self, tr, nan_dur_theta, dist_theta):
-        nan_filt = np.isnan(tr['LATITUDE']) | np.isnan(
-            tr['LONGITUDE']) | pd.isna(tr['ZH_LABEL'])
+    def __check_invalid_tr(self, tr):
+        nan_filt = np.isnan(tr['LATITUDE']) | np.isnan(tr['LONGITUDE']) | \
+            pd.isna(tr['ZH_LABEL'])
 
         nan_dur_sum = tr[nan_filt].DURATION.sum()
 
         if nan_dur_sum == 0:
             return tr
 
-        if nan_dur_sum >= nan_dur_theta:
+        if nan_dur_sum >= self.nan_dur_theta:
             return tr.drop(tr.index)
 
         nan_index = tr[nan_filt].index
+
+        # All the points in this tr are NaN
+        if nan_index.shape[0] == tr.index.shape[0]:
+            return tr.drop(tr.index)
+
         n = nan_index.shape[0]
         left = nan_index[0] - 1
         coord_col = ['LATITUDE', 'LONGITUDE']
+
         for i in range(1, n):
             if nan_index[i] - nan_index[i - 1] != 1:
-                d = get_dist(self.df.loc[left, coord_col],
-                             self.df.loc[nan_index[i - 1] + 1, coord_col])
-                if d >= dist_theta:
-                    return tr.drop(tr.index)
+                if left >= self.df.index[0]:
+                    d = get_dist(self.df.loc[left, coord_col],
+                                 self.df.loc[nan_index[i - 1] + 1, coord_col])
+                    if d >= self.dist_theta:
+                        return tr.drop(tr.index)
                 left = nan_index[i] - 1
-        d = get_dist(self.df.loc[left, coord_col],
-                     self.df.loc[nan_index[-1] + 1, coord_col])
-        if d >= dist_theta:
-            return tr.drop(tr.index)
+
+        if left != -1 and nan_index[-1] + 1 <= self.df.index[-1]:
+            d = get_dist(self.df.loc[left, coord_col],
+                         self.df.loc[nan_index[-1] + 1, coord_col])
+            if d >= self.dist_theta:
+                return tr.drop(tr.index)
 
         return tr.drop(nan_index)
 
-    def __delete_invalid_area(self, tr, min_dur):
+    def __delete_invalid_area(self, tr):
 
         durs, cids = tr['DURATION'].values, tr['CLUSTER_ID'].values
         sas: List[SA] = []
@@ -158,13 +200,13 @@ class StopAreaMining:
 
         # find the first SA where dur_sum >= min_dur
         for i in range(n):
-            if sas[i].dur_sum >= min_dur:
+            if sas[i].dur_sum >= self.min_dur:
                 left = i
                 break
         is_valid[0:sas[left].left] = False
 
         for i in range(left + 1, n):
-            if sas[i].cid == sas[left].cid or sas[i].dur_sum >= min_dur:
+            if sas[i].cid == sas[left].cid or sas[i].dur_sum >= self.min_dur:
                 left = i
             else:
                 is_valid[sas[i].left:sas[i].right+1] = False
