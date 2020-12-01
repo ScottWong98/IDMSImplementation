@@ -54,6 +54,8 @@ class DataProcess:
         _df = None
         for _, user in user_grp:
             tr_gen = self.process_single_user(user)
+            if tr_gen.df.shape[0] == 0 or tr_gen.norm_df is None:
+                continue
             norm_df = tr_gen.norm_df
             _df = norm_df if _df is None else pd.concat([_df, norm_df])
         self.df = _df
@@ -63,11 +65,9 @@ class DataProcess:
 
         tr_gen = TrajectoryGenerator(user)
 
-        tr_gen.stop_area_mining(self.nan_dur_sum, self.dist_theta,
-                                self.point_dur_theta, self.eps, self.min_dur)
-
-        tr_gen.semantic_tag_conversion(self.poi_gen, self.dur_sum_theta)
-        tr_gen.normalize_trajectory()
+        tr_gen.run(self.nan_dur_sum, self.dist_theta,
+                   self.point_dur_theta, self.eps, self.min_dur,
+                   self.poi_gen, self.dur_sum_theta)
 
         return tr_gen
 
@@ -83,6 +83,23 @@ class TrajectoryGenerator:
 
         self.df: pd.DataFrame = df
         self.norm_df: pd.DataFrame = None
+
+    def run(
+        self,
+        nan_dur_sum,
+        dist_theta,
+        point_dur_theta,
+        eps,
+        min_dur,
+        poi_gen,
+        theta
+    ):
+        self.stop_area_mining(nan_dur_sum, dist_theta,
+                              point_dur_theta, eps, min_dur)
+        if self.df.shape[0] == 0:
+            return
+        self.semantic_tag_conversion(poi_gen, theta)
+        self.normalize_trajectory()
 
     def stop_area_mining(self, nan_dur_sum, dist_theta, point_dur_theta, eps, min_dur):
 
