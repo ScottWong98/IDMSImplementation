@@ -8,6 +8,7 @@ class TrajectoryGenerator:
 
     def __init__(self):
         self.df: pd.DataFrame = None
+        self.norm_df: pd.DataFrame = None
 
     def load_data(self, filename, usecols, name_mapper, out_filename=None):
         self.df = pd.read_csv(filename, encoding='gbk')
@@ -60,6 +61,17 @@ class TrajectoryGenerator:
             else:
                 df = pd.concat([df, _df])
         self.df = df
+
+    def normalize_trajectory(self):
+
+        columns = ['USER_ID', 'STAT_DATE', 'LATITUDE',
+                   'LONGITUDE', 'small_ctg', 'medium_ctg', 'big_ctg']
+        self.norm_df = self.df.loc[:, columns]
+        self.norm_df.rename(columns={
+            'small_ctg': 'SEM1',
+            'medium_ctg': 'SEM2',
+            'big_ctg': 'SEM3'
+        }, inplace=True)
 
     def __stop_area_mining(self, user, nan_dur_sum, dist_theta, point_dur_theta, eps, min_dur):
 
