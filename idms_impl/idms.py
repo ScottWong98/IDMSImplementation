@@ -28,6 +28,8 @@ class IDMS:
         self.sef_tree = None
         self.spf_tree = None
 
+        self.query_tr_df = None
+
     def build(self, raw_df, grid_size):
 
         raw_df.reset_index(drop=True, inplace=True)
@@ -46,21 +48,24 @@ class IDMS:
         self.spf_tree = IndexTree(self.spf_df)
         self.spf_tree.build()
 
-    def query(self, query_df, beta):
+    def query(self, query_tr_df, beta):
 
-        assert query_df is not None
+        assert query_tr_df is not None
 
-        assert len(query_df.groupby(['USER_ID', 'STAT_DATE'], sort=False)) == 1
+        assert len(query_tr_df.groupby(
+            ['USER_ID', 'STAT_DATE'], sort=False)) == 1
 
-        query_df.reset_index(drop=True, inplace=True)
-        query_df = self.rasterize(query_df)
+        query_tr_df.reset_index(drop=True, inplace=True)
+        query_tr_df = self.rasterize(query_tr_df)
+
+        self.query_tr_df = query_tr_df
 
         if beta < 0.5:
             query_f_df = self.gen_multi_level_index(
-                query_df.copy(), self.SEF_INDEX)
+                query_tr_df.copy(), self.SEF_INDEX)
         else:
             query_f_df = self.gen_multi_level_index(
-                query_df.copy(), self.SPF_INDEX)
+                query_tr_df.copy(), self.SPF_INDEX)
 
         query_tree = IndexTree(query_f_df)
         query_tree.build()
@@ -76,14 +81,14 @@ class IDMS:
                 self.df['STAT_DATE'] == tid[1])
             similar_tr_df = self.df[filt].loc[:, self.VALID_COLUMNS]
             similar_tr_df.sort_values(by=['STIME'], inplace=True)
-            sim_info = simds(query_df, similar_tr_df, beta)
+            sim_info = simds(query_tr_df, similar_tr_df, beta)
             res_list.append(sim_info)
         sim_df = pd.DataFrame(res_list)
 
         sim_df.sort_values(by=['SIM_VALUE'], ascending=False, inplace=True)
         sim_df.reset_index(drop=True, inplace=True)
 
-        return tids, sim_df
+        return sim_df
 
     def update(self, new_df):
 
@@ -124,3 +129,17 @@ class IDMS:
         f_df.set_index(index, inplace=True)
         f_df = f_df.sort_index()
         return f_df
+
+    def get_query_tr_coords(self):
+        return self.query_tr_df[['LONGITUDE', 'LATITUDE']].values
+
+    def get_similar_tr_coords(self, user_id, date):
+        filt = (self.df['USER_ID'] == user_id) & (self.df['STAT_DATE'] == date)
+        return self.df[filt][['LONGITUDE', 'LATITUDE']].values
+
+    def get_query_tr_df(self):
+        return self.query_tr_df.copy()
+
+    def get_similar_tr_df(self, user_id, date):
+        filt = (self.df['USER_ID'] == user_id) & (self.df['STAT_DATE'] == date)
+        return self.df.copy()[filt]
